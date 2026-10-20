@@ -7,6 +7,7 @@ import {BrowserMigration} from '../docs/browser-engine.js';
 import {sha256,bytesToHex} from '../docs/vendor/archive.js';
 import {BrowserPCloud,Retryable,AuthError} from '../docs/browser-pcloud.js';
 import {consumeCallback,sessionAuth} from '../docs/browser-auth.js';
+import {cleanupChecklist,AUDIT_LIFETIME} from '../docs/cleanup.js';
 
 async function zip(entries,name='takeout.zip',options={}){
   const writer=new ZipWriter(new BlobWriter(),{useWebWorkers:false});
@@ -33,6 +34,27 @@ async function setup(){
   engine.auth={host:'eapi.pcloud.com',token:'dummy'};engine.client=()=>cloud;
   return{journal,cloud,engine,signal:new AbortController().signal};
 }
+
+test('Cleanup requires fresh full verification and every manual confirmation; restore invalidates it',async()=>{
+  const {engine,journal,signal,cloud}=await setup();
+  await engine.select([await zip({'photo.jpg':'photo'})]);await engine.scan(signal);await engine.run(signal);
+  assert.equal(engine.snapshot().cleanup.ready,false);
+  await engine.verify(signal);assert.equal(engine.snapshot().cleanup.ready,false);
+  await engine.verify(signal,true);const state=engine.snapshot().cleanup;assert.equal(state.ready,true);
+  const confirmations={expectedParts:1,exportComplete:true,copiesReviewed:true,devicesReviewed:true,reportSaved:true,reportOffered:true};
+  assert.equal(cleanupChecklist(state,confirmations).ready,true);
+  for(const field of ['exportComplete','copiesReviewed','devicesReviewed','reportSaved','reportOffered'])assert.equal(cleanupChecklist(state,{...confirmations,[field]:false}).ready,false);
+  assert.equal(cleanupChecklist(state,{...confirmations,expectedParts:2}).ready,false);
+  engine.settings['cleanup-audit'].completedAt=new Date(Date.now()-AUDIT_LIFETIME-1000).toISOString();
+  assert.equal(engine.snapshot().cleanup.ready,false);
+  await engine.verify(signal,true);
+  const backup=await journal.backup();await journal.restore(backup);await engine.load();
+  assert.equal(engine.settings['cleanup-audit'],undefined);assert.equal(engine.snapshot().cleanup.ready,false);
+  await engine.run(signal);await engine.verify(signal,true);
+  [...cloud.files.values()][0].payload=new TextEncoder().encode('corrupted');
+  await assert.rejects(engine.verify(signal,true));assert.equal(engine.snapshot().cleanup.ready,false);
+  journal.db.close();
+});
 
 test('Browser engine hashes ZIPs, deduplicates albums, keeps homonyms and dates',async()=>{
   const {journal,cloud,engine,signal}=await setup();

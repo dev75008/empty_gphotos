@@ -109,6 +109,20 @@ Si toute la bibliothèque ne tient pas localement, traitez les parties une à un
 
 Les compteurs portent sur les fichiers uniques, y compris les JSON. Leur nombre n'est donc pas directement comparable au compteur de photos Google. Un bilan ne prouve que le transfert des ZIP fournis, jamais la complétude de ce que Google a choisi d'exporter.
 
+## Nettoyer Google Photos après vérification
+
+La section **Après le transfert : nettoyer Google Photos** propose un guide de suppression manuelle. L’API officielle ne propose aucune méthode pour supprimer les médias de la bibliothèque ; retirer un média d’un album ne le supprime pas du compte. Le site ne peut donc pas vider automatiquement Google Photos. [Référence officielle de l’API](https://developers.google.com/photos/library/reference/rest).
+
+1. Cliquez sur **Contrôler intégralement avant nettoyage**. Chaque fichier distant est relu et comparé aux empreintes de l’export. Le contrôle doit réussir sans fichier restant ni erreur.
+2. Téléchargez et conservez le **dossier de contrôle**, qui contient le journal de reprise et le bilan.
+3. Indiquez le nombre total de parties annoncé par Google Takeout. Il doit correspondre au nombre de ZIP inventoriés.
+4. Confirmez le périmètre de l’export, la conservation des copies, l’ouverture d’un échantillon sur pCloud et les effets sur les appareils synchronisés.
+5. Ouvrez le guide puis Google Photos. Vérifiez le bon compte et supprimez manuellement les médias transférés, par lots, en tenant compte des éléments ajoutés depuis l’export.
+
+Le contrôle expire après 24 heures. Une nouvelle analyse, un transfert, un nouveau contrôle ou une restauration du journal invalide l’autorisation précédente. Les confirmations doivent être refaites après rechargement de la page. Ce dispositif vérifie **les ZIP fournis**, pas la couverture de toute la photothèque Google : le nombre de parties reste une déclaration utilisateur.
+
+Ne videz pas immédiatement la corbeille. Une suppression peut se répercuter sur les appareils avec sauvegarde activée ; la suppression définitive est irréversible. Consultez les règles actuelles et la procédure dans [l’aide Google Photos](https://support.google.com/photos/answer/6128858?hl=fr&co=GENIE.Platform%3DDesktop).
+
 ## Limites réseau et erreurs
 
 - Les appels pCloud utilisent HTTPS et des requêtes POST. Aucun jeton n'est placé dans une URL d'API ni envoyé à GitHub. Aucun proxy tiers n'est utilisé.

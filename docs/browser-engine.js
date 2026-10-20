@@ -1,5 +1,6 @@
 import {ZipReader,BlobReader,BlobWriter,configure,sha256,sha1,bytesToHex} from './vendor/archive.js';
 import {BrowserPCloud,Retryable,AuthError,abort} from './browser-pcloud.js';
+import {cleanupState,inventoryFingerprint} from './cleanup.js';
 configure({useWebWorkers:false,useCompressionStream:true,chunkSize:1024*1024});
 const text=new TextEncoder();
 const parent=path=>path.includes('/')?path.slice(0,path.lastIndexOf('/')):'.';
@@ -117,6 +118,7 @@ export class BrowserMigration{
     }
   }
   async scan(signal){
+    await this.setting('cleanup-audit',null);
     if(!this.selected.length)throw new Error('Choisissez les ZIP Takeout.');
     await this.prepare(signal);
     for(const [id,opened] of this.openArchives){
@@ -212,6 +214,7 @@ export class BrowserMigration{
     }
   }
   async run(signal){
+    await this.setting('cleanup-audit',null);
     if(!this.objects.size||[...this.archives.values()].some(row=>!row.complete))throw new Error('Analysez complètement les archives avant le transfert.');
     await this.prepare(signal);const client=this.client(signal),root=await this.bind(client,signal);let failures=0;
     for(const object of this.objects.values()){
@@ -224,6 +227,7 @@ export class BrowserMigration{
     if(failures)throw new Error(`${failures} fichier(s) restent en erreur. Consultez le journal puis reprenez.`);
   }
   async verify(signal,deep=false){
+    await this.setting('cleanup-audit',null);
     if(!this.settings.binding||!this.objects.size)throw new Error('Aucun transfert à contrôler.');
     const client=this.client(signal);await this.bind(client,signal);let failures=0,index=0;
     for(const object of this.objects.values()){
@@ -235,6 +239,9 @@ export class BrowserMigration{
       this.notify();
     }
     if(failures||[...this.archives.values()].some(row=>!row.complete))throw new Error('Le contrôle est incomplet. Consultez les fichiers en erreur et les parties manquantes.');
+    abort(signal);
+    if(deep)await this.setting('cleanup-audit',{completedAt:new Date().toISOString(),deep:true,
+      inventory:inventoryFingerprint(this.objects,this.archives,this.settings.binding)});
   }
   snapshot(){
     let verified=0,errors=0,size=0,verifiedBytes=0;const errorRows=[];
@@ -247,6 +254,8 @@ export class BrowserMigration{
       database:{total:this.objects.size,verified,remaining:this.objects.size-verified,errors,bytes:size,verified_bytes:verifiedBytes,
         archives:[...this.archives.values()].map(row=>({...row,path:row.name})),binding:this.settings.binding||null,error_rows:errorRows},
       pcloud:{configured:Boolean(this.settings.client_id),connected:Boolean(this.identity&&this.auth),userid:this.identity?.userid,hostname:this.auth?.host},
-      job:this.job,logs:this.logs,log_sequence:this.sequence};
+      job:this.job,logs:this.logs,log_sequence:this.sequence,
+      cleanup:cleanupState({objects:this.objects,archives:this.archives,binding:this.settings.binding,
+        audit:this.settings['cleanup-audit'],identity:this.identity,auth:this.auth,busy:this.job.running})};
   }
 }

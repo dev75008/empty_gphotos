@@ -8,8 +8,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.pcloud.com https://eapi.pcloud.com https://*.pcloud.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Passage Photos · Google Photos vers pCloud</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=2">
-  <script type="module" src="./app.js?v=2"></script>
+  <link rel="stylesheet" href="./style.css?v=3">
+  <script type="module" src="./app.js?v=3"></script>
 </head>
 <body>
   <a href="#main" class="skip">Aller au transfert</a>
@@ -87,6 +87,21 @@
 
     <section id="archives-section" class="archive-panel" hidden aria-labelledby="archives-title"><div class="section-heading"><h2 id="archives-title">Archives inventoriées</h2><span id="archives-count" class="small"></span></div><div id="archive-list"></div><p class="small">Comparez cette liste avec toutes les parties indiquées par Google Takeout.</p></section>
     <section id="errors-section" class="error-panel" hidden aria-labelledby="errors-title"><h2 id="errors-title">Fichiers à reprendre</h2><ul id="error-list"></ul></section>
+    <section class="cleanup-panel" aria-labelledby="cleanup-title">
+      <div class="section-heading"><h2 id="cleanup-title">Après le transfert : nettoyer Google Photos</h2><span id="cleanup-status" class="small">Contrôle requis</span></div>
+      <p>La suppression se fait dans Google Photos. Son API ne permet pas à cette page de supprimer votre bibliothèque.</p>
+      <p class="small">Le contrôle porte sur les ZIP fournis. Vous devez confirmer que l’export couvre tout le compte à nettoyer, y compris les ajouts récents.</p>
+      <div class="cleanup-controls"><button id="cleanup-audit-button" class="button secondary" disabled>Contrôler intégralement avant nettoyage</button><button id="cleanup-report-button" class="text-button" disabled>Télécharger le dossier de contrôle</button></div>
+      <p id="cleanup-hint" class="small" role="status">Analysez et transférez vos archives Takeout.</p>
+      <fieldset id="cleanup-fields" disabled>
+        <label for="cleanup-parts">Nombre total de parties annoncé par Google Takeout</label><input id="cleanup-parts" type="number" min="1" step="1" inputmode="numeric" aria-describedby="cleanup-parts-help"><p id="cleanup-parts-help" class="small">Comparez avec la liste de téléchargement Google, et non avec le nombre de photos.</p>
+        <label class="checkbox-label"><input id="cleanup-export" type="checkbox">J’ai inclus toutes les années et tous les albums du bon compte, et vérifié les ajouts depuis l’export.</label>
+        <label class="checkbox-label"><input id="cleanup-copies" type="checkbox">J’ai gardé les ZIP et ouvert un échantillon de photos et vidéos reçues sur pCloud.</label>
+        <label class="checkbox-label"><input id="cleanup-devices" type="checkbox">J’ai vérifié l’effet de la suppression sur mes appareils synchronisés et leurs copies locales.</label>
+        <label class="checkbox-label"><input id="cleanup-saved" type="checkbox">J’ai enregistré le journal et le bilan téléchargés, hors des données du navigateur.</label>
+      </fieldset>
+      <div class="cleanup-controls"><button id="cleanup-guide-button" class="button secondary" disabled>Afficher le guide de suppression</button><span id="cleanup-checklist-hint" class="small">Le guide sera disponible après les contrôles et confirmations.</span></div>
+    </section>
     <details class="logs"><summary>Journal des opérations</summary><pre id="logs" tabindex="0">Les opérations apparaîtront ici.</pre></details>
     <footer><p>Les fichiers Google restent en place. Rien n'est supprimé automatiquement.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
   </main>
@@ -100,6 +115,13 @@
     <details><summary>Comment reprendre après fermeture ?</summary><p>Revenez sur cette page avec le même navigateur et le même profil, reconnectez pCloud si nécessaire et sélectionnez à nouveau les ZIP utiles. Cliquez sur Reprendre le transfert. Ne supprimez pas les données du site. Sauvegardez régulièrement le journal et conservez vos ZIP : un navigateur peut effacer son stockage local.</p></details>
     <details><summary>Les gros fichiers et le disque</summary><p>Il faut assez de place pour les ZIP et pour préparer le plus gros fichier individuel. Aucun ZIP complet n'est décompressé. Sans espace privé sur disque pris en charge par le navigateur, la préparation en mémoire est limitée à 128 Mo par fichier. Certaines relectures distantes peuvent être bloquées par les règles réseau de pCloud ; un fichier non contrôlé n'est pas déclaré vérifié.</p></details>
     <a class="button secondary" href="https://github.com/dev75008/empty_gphotos#readme" target="_blank" rel="noopener noreferrer">Lire le guide détaillé</a>
+  </dialog>
+  <dialog id="cleanup-dialog" aria-labelledby="cleanup-dialog-title"><div class="dialog-heading"><h2 id="cleanup-dialog-title">Supprimer dans Google Photos</h2><button id="cleanup-close" class="text-button">Fermer</button></div>
+    <p id="cleanup-proof"></p>
+    <p>Ce contrôle valide les fichiers fournis, pas la totalité de votre compte Google. Cette page n’exécute aucune suppression.</p>
+    <ol><li>Dans Google Photos, vérifiez l’adresse du <strong>compte Google correspondant à l’export</strong>.</li><li>Vérifiez les réglages de sauvegarde et les copies de vos téléphones et tablettes. Une suppression Google Photos peut se répercuter sur les appareils synchronisés.</li><li>Sélectionnez les photos et vidéos transférées, par lots, puis choisissez <strong>Placer dans la corbeille</strong>. Confirmez dans Google. Répétez pour les éléments restants, en vérifiant aussi les archives et dossiers concernés.</li><li>Conservez les éléments absents de votre export. N’utilisez pas le nombre de fichiers pCloud pour décider du nombre à supprimer : les JSON et la déduplication changent ce nombre.</li><li><strong>Ne videz pas immédiatement la corbeille.</strong> Vérifiez vos copies et le délai de restauration indiqué par Google. Une suppression définitive ne peut pas être annulée ; arrêtez-vous si Google la propose à cause d’une corbeille pleine.</li></ol>
+    <a id="cleanup-open-google" class="button secondary" href="https://photos.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Photos pour supprimer manuellement</a>
+    <p><a href="https://support.google.com/photos/answer/6128858?hl=fr&amp;co=GENIE.Platform%3DDesktop" target="_blank" rel="noopener noreferrer">Lire les consignes officielles de suppression Google</a></p>
   </dialog>
   <noscript><p class="notice">Activez JavaScript pour piloter le transfert, ou utilisez la version en ligne de commande.</p></noscript>
 </body>

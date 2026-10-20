@@ -1,12 +1,40 @@
 import {emptyStatus,progressOf,bytes,jobLabel,readiness} from './model.js';
-import {openJournal} from './browser-state.js';
-import {BrowserMigration} from './browser-engine.js';
+import {openJournal} from './browser-state.js?v=3';
+import {BrowserMigration} from './browser-engine.js?v=3';
 import {beginAuth,consumeCallback,redirectURI} from './browser-auth.js';
+import {cleanupChecklist} from './cleanup.js';
 
 const $=id=>document.getElementById(id);
 const format=value=>new Intl.NumberFormat('fr-FR').format(value);
 const plural=(value,noun)=>`${format(value)} ${noun}${value===1?'':'s'}`;
 let engine,status=emptyStatus(),supported=false,pending=false,folderDirty=false,detail='',renderTimer;
+let cleanupReportKey='',cleanupCurrentKey='';
+const auditKey=state=>state?.ready?state.completedAt+'|'+state.inventory:'';
+function checklist(){
+  const technical=engine?.snapshot().cleanup||{ready:false,reason:'Analysez et transférez vos archives Takeout.'};
+  const expected=$('cleanup-parts').value.trim();
+  return cleanupChecklist(technical,{expectedParts:expected?Number(expected):0,
+    exportComplete:$('cleanup-export').checked,copiesReviewed:$('cleanup-copies').checked,
+    devicesReviewed:$('cleanup-devices').checked,reportSaved:$('cleanup-saved').checked,
+    reportOffered:Boolean(cleanupReportKey)&&cleanupReportKey===auditKey(technical)});
+}
+function renderCleanup(){
+  const technical=status.cleanup||{ready:false,reason:'Analysez et transférez vos archives Takeout.'};
+  const key=auditKey(technical),busy=status.job.running||pending;
+  if(cleanupCurrentKey!==key){
+    for(const id of ['cleanup-export','cleanup-copies','cleanup-devices','cleanup-saved'])$(id).checked=false;
+    cleanupReportKey='';cleanupCurrentKey=key;
+    $('cleanup-dialog').close();
+  }
+  $('cleanup-status').textContent=technical.ready?'Contrôle intégral réussi':'Contrôle requis';
+  $('cleanup-hint').textContent=technical.ready?`${technical.archiveCount} partie(s) inventoriée(s). Contrôle intégral du ${new Date(technical.completedAt).toLocaleString('fr-FR')}.`:technical.reason;
+  $('cleanup-audit-button').disabled=!supported||busy||!status.pcloud.connected||!status.database.binding||!status.database.total||status.database.remaining>0||status.database.archives.some(row=>!row.complete);
+  $('cleanup-report-button').disabled=!technical.ready||busy;
+  $('cleanup-fields').disabled=!technical.ready||busy;
+  const decision=engine?checklist():{ready:false,reason:technical.reason};
+  $('cleanup-guide-button').disabled=!decision.ready||busy;
+  $('cleanup-checklist-hint').textContent=decision.reason;
+}
 function message(text,error=false){$('notice').textContent=text;$('notice').classList.toggle('error',error);$('notice').hidden=!text;}
 function changed(event){
   if(event?.detail)detail=event.detail;
@@ -59,6 +87,7 @@ function render(){
   }));
   $('errors-section').hidden=!db.error_rows.length;
   $('error-list').replaceChildren(...db.error_rows.map(error=>{const li=document.createElement('li');li.textContent=`${error.name} : ${error.error}`;return li;}));
+  renderCleanup();
 }
 async function act(operation){
   if(pending)return;pending=true;message('');render();
@@ -92,6 +121,29 @@ $('run-button').addEventListener('click',()=>start('run',async signal=>{
 }));
 $('pause-button').addEventListener('click',()=>engine.pause());
 $('verify-button').addEventListener('click',()=>start('verify',signal=>engine.verify(signal,$('deep').checked)));
+$('cleanup-audit-button').addEventListener('click',()=>start('verify',signal=>engine.verify(signal,true)));
+$('cleanup-report-button').addEventListener('click',()=>act(async()=>{
+  const technical=engine.snapshot().cleanup;
+  if(!technical.ready)throw new Error(technical.reason);
+  const journal=await engine.journal.backup();
+  journal.cleanup_review={audit:engine.settings['cleanup-audit'],summary:await summary(),
+    scope:'Contrôle des ZIP fournis uniquement. Aucune preuve de couverture de tout le compte Google.'};
+  download(journal,'passage-photos-avant-nettoyage.json');
+  cleanupReportKey=auditKey(technical);
+  message('Dossier de contrôle proposé au téléchargement. Enregistrez-le puis confirmez les vérifications ci-dessous.');
+}));
+for(const id of ['cleanup-parts','cleanup-export','cleanup-copies','cleanup-devices','cleanup-saved'])$(id).addEventListener('input',renderCleanup);
+$('cleanup-guide-button').addEventListener('click',()=>{
+  const decision=checklist();
+  if(!decision.ready){message(decision.reason,true);return;}
+  const technical=engine.snapshot().cleanup;
+  $('cleanup-proof').textContent=`${status.database.verified} fichiers uniques contrôlés intégralement sur pCloud ; ${technical.archiveCount} parties Takeout inventoriées. Contrôle du ${new Date(technical.completedAt).toLocaleString('fr-FR')}.`;
+  $('cleanup-dialog').showModal();
+});
+$('cleanup-close').addEventListener('click',()=>$('cleanup-dialog').close());
+$('cleanup-open-google').addEventListener('click',event=>{
+  const decision=checklist();if(!decision.ready){event.preventDefault();$('cleanup-dialog').close();message(decision.reason,true);}
+});
 $('backup-button').addEventListener('click',()=>act(async()=>download(await engine.journal.backup(),'passage-photos-journal.json')));
 $('summary-button').addEventListener('click',()=>act(async()=>download(await summary(),'passage-photos-bilan.json')));
 $('manifest-button').addEventListener('click',()=>act(async()=>{
@@ -128,3 +180,4 @@ async function initialize(){
   }catch(error){message(error.message,true);}
 }
 render();initialize();
+setInterval(()=>{if(engine&&!engine.job.running){status=engine.snapshot();renderCleanup();}},60000);

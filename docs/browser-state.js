@@ -54,7 +54,10 @@ export async function openJournal(name=DATABASE) {
       const tx=db.transaction(stores,'readwrite',{durability:'strict'});
       for(const name of stores){
         const store=tx.objectStore(name);store.clear();
-        for(const row of data[name])store.put(name==='objects'?{...row,status:'pending',error:null}:row);
+        for(const row of data[name]){
+          if(name==='settings'&&row.id==='cleanup-audit')continue;
+          store.put(name==='objects'?{...row,status:'pending',error:null}:row);
+        }
       }
       await finished(tx);
     }
@@ -73,7 +76,7 @@ export function validateBackup(data){
   const archives=new Set(data.archives.map(row=>row.id));
   if(data.archives.some(row=>!hex.test(row.id)||typeof row.name!=='string'))throw new Error('Archive invalide dans le journal.');
   if(data.sources.some(row=>!ids.has(row.digest)||!archives.has(row.archive)||!Number.isSafeInteger(row.ordinal)||row.ordinal<0||typeof row.path!=='string'))throw new Error('Provenance invalide dans le journal.');
-  if(data.settings.some(row=>!['binding','folder','client_id','folders'].includes(row.id)))throw new Error('Paramètre inattendu dans le journal.');
+  if(data.settings.some(row=>!['binding','folder','client_id','folders','cleanup-audit'].includes(row.id)))throw new Error('Paramètre inattendu dans le journal.');
   const binding=data.settings.find(row=>row.id==='binding')?.value;
   if(binding&&(!['api.pcloud.com','eapi.pcloud.com'].includes(binding.host)||!Number.isSafeInteger(binding.folderid)||!Number.isSafeInteger(binding.userid)))throw new Error('Destination invalide dans le journal.');
 }
