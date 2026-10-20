@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Transférez vos archives Google Photos vers pCloud, avec reprise et contrôle d'intégrité.">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Passage Photos · Google Photos vers pCloud</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a href="#main" class="skip">Aller au transfert</a>
+  <header class="topbar"><div class="topbar-inner">
+    <a class="brand" href="./" aria-label="Passage Photos, accueil">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 8h12v16H4zM16 8h12v16H16" stroke="currentColor" stroke-width="1.5"/><path d="m8 19 4-4 4 4m4-7 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="12" r="1.3" fill="currentColor"/></svg>
+      <span>Passage Photos</span>
+    </a>
+    <div class="top-actions"><span id="connection-badge" class="connection">Ordinateur non connecté</span><button id="help-button" class="text-button">Mode d'emploi</button></div>
+  </div></header>
+
+  <main id="main" class="canvas">
+    <div class="heading"><div><h1>Votre photothèque, sur pCloud.</h1><p>Un transfert à votre rythme. Une reprise là où vous en étiez.</p></div><span class="personal">Votre espace personnel</span></div>
+
+    <section id="connect-panel" class="connect-panel" aria-labelledby="connect-title">
+      <div><h2 id="connect-title">Relier cet ordinateur</h2><p>Ouvrez le petit compagnon local pour accéder à vos archives et garder votre progression.</p>
+        <ol class="connection-steps"><li>Téléchargez et décompressez l'application.</li><li>Double-cliquez sur <strong>Lancer-interface.cmd</strong>. Cette page s'ouvrira connectée.</li></ol>
+        <p class="small">Python 3.11 ou plus est requis. Vos photos vont directement de votre ordinateur à pCloud.</p>
+        <p id="connection-error" class="inline-error" role="status" hidden></p>
+      </div>
+      <a class="button primary" href="https://github.com/dev75008/empty_gphotos/archive/refs/heads/main.zip">Télécharger l'application</a>
+    </section>
+
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <div class="workspace">
+      <div class="preparation">
+        <div class="route" aria-label="De Google Photos, via Google Takeout, vers pCloud"><span>Google Photos</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5"/></svg><span>Archives Takeout</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5"/></svg><span>pCloud</span></div>
+        <section class="step" aria-labelledby="pcloud-title">
+          <div class="step-header"><span class="step-number">1</span><div><h2 id="pcloud-title">Connecter pCloud</h2><p id="pcloud-description">Le compte qui recevra vos photos et vidéos.</p></div><span id="pcloud-state" class="step-state">À préparer</span></div>
+          <div class="step-body">
+            <button id="auth-button" class="button secondary" disabled>Connecter mon compte pCloud</button>
+            <details id="credentials-details"><summary>Configurer mon application pCloud</summary>
+              <p>Créez une application dans <a href="https://docs.pcloud.com/my_apps/" target="_blank" rel="noopener noreferrer">pCloud Developers</a>. Ajoutez cette URI de redirection :</p>
+              <div class="copy-row"><code>http://127.0.0.1:8765/callback</code><button id="copy-redirect" class="text-button">Copier</button></div>
+              <form id="credentials-form"><fieldset id="credentials-fields" disabled>
+                <label for="client-id">Client ID / App Key</label><input id="client-id" name="client_id" autocomplete="off" spellcheck="false" required>
+                <label for="client-secret">Client Secret</label><input id="client-secret" type="password" name="client_secret" autocomplete="new-password" required>
+                <p class="small">Ces accès restent dans le fichier de configuration sur votre ordinateur.</p>
+                <button class="button secondary" type="submit">Enregistrer les accès</button>
+              </fieldset></form>
+            </details>
+          </div>
+        </section>
+
+        <section class="step" aria-labelledby="takeout-title">
+          <div class="step-header"><span class="step-number">2</span><div><h2 id="takeout-title">Choisir vos archives</h2><p>Les ZIP Google Takeout, sans les décompresser.</p></div><span id="archive-state" class="step-state">À préparer</span></div>
+          <div class="step-body">
+            <div class="archive-choice"><svg class="file-icon" width="32" height="36" viewBox="0 0 32 36" fill="none" aria-hidden="true"><path d="M6 2h13l7 7v25H6zM19 2v8h7M14 14h5m-5 5h5m-5 5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><div><strong id="selection-label">Aucune archive sélectionnée</strong><span id="selection-detail" class="small">Vous pouvez ajouter les parties une par une.</span></div><button id="pick-button" class="button secondary" disabled>Choisir les ZIP</button></div>
+            <div class="step-actions"><a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer">Obtenir mon export Google Takeout</a><button id="scan-button" class="text-button" disabled>Analyser les archives</button></div>
+            <details><summary>Saisir un chemin de dossier</summary><form id="paths-form"><fieldset id="paths-fields" disabled><label for="paths">Chemin des ZIP sur cet ordinateur</label><textarea id="paths" rows="2" placeholder="D:\Takeout" spellcheck="false"></textarea><p class="small">Un dossier ou une archive ZIP par ligne.</p><button class="button secondary" type="submit">Utiliser ces chemins</button></fieldset></form></details>
+          </div>
+        </section>
+
+        <section class="step last-step" aria-labelledby="destination-title">
+          <div class="step-header"><span class="step-number">3</span><div><h2 id="destination-title">Choisir la destination</h2><p>Le dossier est créé dans votre espace pCloud.</p></div></div>
+          <div class="step-body"><label for="folder">Nom du dossier pCloud</label><input id="folder" value="Ma phototheque" maxlength="240" disabled><p id="folder-help" class="small">Vous pourrez le renommer dans pCloud après sa création.</p></div>
+        </section>
+
+        <div class="transfer-actions"><button id="run-button" class="button primary" disabled>Lancer le transfert</button><span id="run-hint" class="small">Reliez d'abord cet ordinateur.</span></div>
+      </div>
+
+      <aside class="monitor" aria-labelledby="progress-title">
+        <div class="monitor-heading"><h2 id="progress-title">Votre transfert</h2><span id="job-state" class="step-state">En attente</span></div>
+        <div class="progress-head"><span id="progress-caption">Aucun fichier analysé</span><span id="percent">0 %</span></div>
+        <progress id="progress" max="100" value="0" aria-label="Fichiers vérifiés sur pCloud">0 %</progress>
+        <dl class="counters"><div><dt>Vérifiés</dt><dd id="count-verified">0</dd></div><div><dt>Restants</dt><dd id="count-remaining">0</dd></div><div><dt>Erreurs</dt><dd id="count-errors">0</dd></div></dl>
+        <div class="volume"><span>Volume vérifié</span><span id="volume">0 octet</span></div>
+        <p id="activity" class="activity" role="status">Préparez votre connexion et vos archives pour commencer.</p>
+        <div id="live-detail" class="small live-detail" hidden></div>
+        <button id="pause-button" class="button secondary full-width" hidden>Mettre en pause</button>
+
+        <div class="monitor-section"><h3>Contrôler l'arrivée</h3><p class="small">Comparez les fichiers reçus avec votre inventaire avant de terminer.</p><button id="verify-button" class="button secondary full-width" disabled>Vérifier les fichiers sur pCloud</button><label class="checkbox-label"><input id="deep" type="checkbox" disabled> Relire aussi tous les octets distants</label></div>
+        <div class="monitor-section report-links"><button id="manifest-button" class="text-button" disabled>Télécharger le manifeste CSV</button><button id="summary-button" class="text-button" disabled>Télécharger le bilan JSON</button></div>
+        <p class="small local-note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v11H5z" stroke="currentColor" stroke-width="1.5"/></svg>Reprise enregistrée sur votre ordinateur.</p>
+      </aside>
+    </div>
+
+    <section id="archives-section" class="archive-panel" hidden aria-labelledby="archives-title"><div class="section-heading"><h2 id="archives-title">Archives inventoriées</h2><span id="archives-count" class="small"></span></div><div id="archive-list"></div><p class="small">Comparez cette liste avec toutes les parties indiquées par Google Takeout.</p></section>
+    <section id="errors-section" class="error-panel" hidden aria-labelledby="errors-title"><h2 id="errors-title">Fichiers à reprendre</h2><ul id="error-list"></ul></section>
+    <details class="logs"><summary>Journal des opérations</summary><pre id="logs" tabindex="0">Les opérations apparaîtront ici.</pre></details>
+    <footer><p>Les fichiers Google restent en place. Rien n'est supprimé automatiquement.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
+  </main>
+
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">Trois étapes, puis le transfert.</h2><button id="close-help" class="text-button" aria-label="Fermer le mode d'emploi">Fermer</button></div>
+    <p>Commencez par télécharger l'application et ouvrir <strong>Lancer-interface.cmd</strong> sur votre ordinateur. Gardez sa fenêtre ouverte pendant la migration.</p>
+    <ol><li><strong>Connectez pCloud.</strong> Configurez votre application pCloud une fois, puis autorisez l'accès dans le navigateur.</li><li><strong>Choisissez les ZIP Takeout.</strong> Demandez l'export complet sur Google Takeout. Téléchargez les parties, sans les décompresser, puis analysez-les ici.</li><li><strong>Nommez le dossier et lancez.</strong> Vous pouvez interrompre puis reprendre avec le même journal local.</li></ol>
+    <p>À la fin, vérifiez les fichiers et comparez les archives traitées avec la liste Takeout. Le bilan concerne les ZIP fournis.</p>
+    <details><summary>Pourquoi un export Google Takeout ?</summary><p>Depuis mars 2025, l'API Google Photos ne permet plus de lire automatiquement votre photothèque existante. Takeout permet de récupérer les fichiers exportés et leurs métadonnées.</p></details>
+    <details><summary>Où sont mes fichiers et mes accès ?</summary><p>GitHub Pages héberge cette interface. Le compagnon local lit les ZIP, garde les accès et le journal SQLite, et envoie les fichiers directement à pCloud. Les médias identiques sont regroupés ; les noms homonymes sont conservés dans des sous-dossiers distincts.</p></details>
+    <details><summary>La liaison locale est bloquée</summary><p>Autorisez l'accès au réseau local si le navigateur le demande. Sinon, fermez le compagnon et lancez <strong>Lancer-interface-locale.cmd</strong> : la même interface fonctionnera entièrement sur cet ordinateur.</p></details>
+    <a class="button secondary" href="https://github.com/dev75008/empty_gphotos#readme" target="_blank" rel="noopener noreferrer">Lire le guide détaillé</a>
+  </dialog>
+  <noscript><p class="notice">Activez JavaScript pour piloter le transfert, ou utilisez la version en ligne de commande.</p></noscript>
+</body>
+</html>

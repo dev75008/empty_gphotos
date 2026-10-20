@@ -1,0 +1,8 @@
+{
+  "client_id": "VOTRE_CLIENT_ID_PCLOUD",
+  "client_secret": "VOTRE_CLIENT_SECRET_PCLOUD",
+  "redirect_uri": "http://127.0.0.1:8765/callback",
+  "hostname": "eapi.pcloud.com",
+  "access_token": "",
+  "attempts": 6
+}
