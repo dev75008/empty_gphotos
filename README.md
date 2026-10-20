@@ -2,7 +2,7 @@
 
 **[Ouvrir l'application sur GitHub Pages](https://dev75008.github.io/empty_gphotos/)**
 
-Aucune installation, aucun Python, aucun compagnon local pour la version web. La page lit les ZIP que vous choisissez, puis envoie leurs fichiers directement à pCloud. GitHub héberge le code de la page ; il ne reçoit pas vos photos, vos vidéos ni votre jeton pCloud.
+Le transfert web ne nécessite aucune installation, aucun Python ni compagnon local. La page lit les ZIP que vous choisissez, puis envoie leurs fichiers directement à pCloud. GitHub héberge le code de la page ; il ne reçoit pas vos photos, vos vidéos ni votre jeton pCloud. Le nettoyage automatisé après transfert utilise une extension Chrome/Edge à installer séparément.
 
 ## Démarrer
 
@@ -111,7 +111,7 @@ Les compteurs portent sur les fichiers uniques, y compris les JSON. Leur nombre 
 
 ## Nettoyer Google Photos après vérification
 
-La section **Après le transfert : nettoyer Google Photos** propose un guide de suppression manuelle. L’API officielle ne propose aucune méthode pour supprimer les médias de la bibliothèque ; retirer un média d’un album ne le supprime pas du compte. Le site ne peut donc pas vider automatiquement Google Photos. [Référence officielle de l’API](https://developers.google.com/photos/library/reference/rest).
+La section **Après le transfert : nettoyer Google Photos** propose un guide de suppression et une extension Chrome/Edge. L’API officielle ne propose aucune méthode pour supprimer les médias de la bibliothèque ; retirer un média d’un album ne le supprime pas du compte. L’extension automatise les clics dans Google Photos, séparément du site. [Référence officielle de l’API](https://developers.google.com/photos/library/reference/rest).
 
 1. Cliquez sur **Contrôler intégralement avant nettoyage**. Chaque fichier distant est relu et comparé aux empreintes de l’export. Le contrôle doit réussir sans fichier restant ni erreur.
 2. Téléchargez et conservez le **dossier de contrôle**, qui contient le journal de reprise et le bilan.
@@ -123,6 +123,44 @@ Le contrôle expire après 24 heures. Une nouvelle analyse, un transfert, un nou
 
 Ne videz pas immédiatement la corbeille. Une suppression peut se répercuter sur les appareils avec sauvegarde activée ; la suppression définitive est irréversible. Consultez les règles actuelles et la procédure dans [l’aide Google Photos](https://support.google.com/photos/answer/6128858?hl=fr&co=GENIE.Platform%3DDesktop).
 
+## Extension de nettoyage Chrome/Edge
+
+**Automatisation expérimentale, dépendante de l’interface Google en français ou anglais.** Les tests couvrent un simulateur d’interface ; aucune suppression dans un véritable compte Google n’a été effectuée pendant le développement. Commencez par le test sur un média et vérifiez vous-même sa présence dans la corbeille. Si Google change ses boutons, l’extension doit s’arrêter ; transmettez le message d’erreur, sans exporter vos cookies ni vos jetons.
+
+### Installer une fois
+
+1. Sur le site, téléchargez **l’extension Chrome/Edge**, puis décompressez le ZIP dans un dossier que vous conserverez.
+2. Dans Chrome, ouvrez `chrome://extensions`. Dans Edge, ouvrez `edge://extensions`.
+3. Activez **Mode développeur**.
+4. Cliquez sur **Charger l’extension non empaquetée** et sélectionnez le dossier `passage-photos-extension` contenant `manifest.json`.
+5. Épinglez **Passage Photos — nettoyage Google Photos** dans le menu des extensions du navigateur.
+
+Aucun serveur ni logiciel compagnon n’est requis. L’extension ne demande que `activeTab`, `scripting` et `storage`. L’accès à la page est accordé quand vous cliquez sur son icône ; elle ne s’installe pas toute seule depuis GitHub Pages, ne lit pas vos cookies et ne reçoit aucun jeton pCloud. Aucun script distant ni appel à une API privée Google n’est utilisé. [Permission activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab).
+
+### Placer les médias dans la corbeille
+
+1. Sur Passage Photos, terminez le **contrôle intégral avant nettoyage**, puis téléchargez le **dossier de contrôle** JSON. Ce contrôle reste valable 24 heures ; refaites-le s’il a expiré.
+2. Ouvrez [Google Photos](https://photos.google.com/) dans le bon compte. Choisissez la langue français ou anglais et la vue **Photos**, sans recherche ni album ouvert.
+3. Cliquez sur l’icône de l’extension. Importez le dossier de contrôle JSON, saisissez l’adresse exacte du compte Google et confirmez la couverture de l’export et vos copies.
+4. Cliquez sur **Ouvrir les commandes dans cet onglet**, puis **Examiner cette vue sans supprimer**. L’extension vérifie l’adresse affichée par Google ; si elle ne peut pas la lire, elle refuse de continuer.
+5. Cliquez sur **Tester sur 1 média** et confirmez. Vérifiez le média dans la corbeille. Revenez à Photos, examinez à nouveau la vue, puis cliquez sur **Continuer par lots de 25** et confirmez.
+6. Gardez cet onglet visible. L’extension sélectionne les médias chargés, confirme uniquement leur mise à la corbeille et attend la disparition des identifiants sélectionnés avant de poursuivre. Elle s’arrête sur un doute, un changement de compte, une confirmation inattendue ou une absence de progression. Une erreur après l’envoi ne provoque jamais une nouvelle confirmation destructive automatique.
+7. Quand Photos est vide, ouvrez **Archive** dans Google Photos et répétez l’examen puis le traitement. Si Google recharge complètement la page, rouvrez l’extension et importez à nouveau le contrôle. Vérifiez séparément le **dossier verrouillé**, les éléments partagés et toute vue non prise en charge. Un arrêt faute de média reconnu ne signifie pas que tout le compte est vide.
+
+**Arrêter** interrompt les prochains clics. Un ordre déjà envoyé à Google peut encore aboutir. Un clic, une touche ou un défilement manuel hors du panneau, ainsi que le masquage de l’onglet, arrête aussi le traitement. Vérifiez et annulez une sélection résiduelle avant de reprendre. Après une fermeture ou un rechargement, aucun traitement ne redémarre automatiquement ; les médias déjà à la corbeille ne figurent plus dans la vue source.
+
+Le panneau permet de télécharger le journal des commandes. Le dernier traitement et ses 200 derniers événements sont aussi conservés dans le stockage local de l’extension ; les sessions anciennes ne sont pas toutes archivées automatiquement. Les événements listent des commandes et des confirmations d’interface, pas une preuve cryptographique de suppression Google.
+
+### Vider définitivement la corbeille
+
+Cette action est distincte et **ne démarre jamais après les lots toute seule**. Elle supprime aussi les éléments déjà présents avant la migration, qui peuvent ne pas être sauvegardés dans votre export.
+
+1. Vérifiez vos copies et le contenu complet de la corbeille. Ouvrez la vue **Corbeille** de Google Photos, puis examinez-la avec le panneau de l’extension.
+2. Dépliez **Vider définitivement la corbeille**. Cochez la confirmation des anciens éléments et saisissez exactement `VIDER LA CORBEILLE`.
+3. Cliquez sur **Vider définitivement la corbeille** et confirmez l’action irréversible. L’extension contrôle à nouveau le compte, reconnaît la confirmation Google puis attend l’indication de corbeille vide. Si cette indication n’est pas reconnue, elle s’arrête sans nouvelle tentative ; vérifiez le résultat directement dans Google Photos.
+
+Le dossier de contrôle est vérifié localement (inventaire, empreinte, compte pCloud, statuts et date). Ce n’est ni un certificat signé de Google, ni une nouvelle vérification distante de pCloud. Il ne permet pas d’associer avec certitude chaque identifiant Google à son fichier Takeout. L’extension supprime les médias de la vue choisie, y compris d’éventuels ajouts postérieurs à l’export : vous devez avoir inclus ceux-ci avant de lancer.
+
 ## Limites réseau et erreurs
 
 - Les appels pCloud utilisent HTTPS et des requêtes POST. Aucun jeton n'est placé dans une URL d'API ni envoyé à GitHub. Aucun proxy tiers n'est utilisé.
@@ -130,7 +168,7 @@ Ne videz pas immédiatement la corbeille. Une suppression peut se répercuter su
 - Les erreurs transitoires ont six tentatives avec attente exponentielle et respect de `Retry-After` jusqu'à une heure. Un envoi ambigu est réconcilié avant sa nouvelle tentative. Les coupures durables, quotas saturés, jetons refusés et conflits sont visibles dans le journal.
 - Une application navigateur ne peut pas renouveler un droit OAuth révoqué. Reconnectez pCloud pour reprendre.
 - `Lancer le transfert` ignore les fichiers déjà vérifiés. Utilisez le contrôle final pour détecter une suppression ou corruption distante ultérieure.
-- Pas de pCloud Crypto, pas de synchronisation continue, pas de récupération de corbeille Google et aucune suppression automatique de vos sources.
+- Pas de pCloud Crypto, pas de synchronisation continue et pas de récupération de corbeille Google. Le transfert ne supprime aucune source ; l’extension de nettoyage distincte exige une activation et des confirmations.
 - La navigation privée, l'effacement des données du site et le changement de profil peuvent faire perdre le journal local. Conservez son export.
 - Aucune garantie contre la perte d'un compte ou une panne de stockage : gardez plusieurs copies jusqu'à la validation finale.
 
@@ -146,6 +184,8 @@ docs/browser-state.js        IndexedDB, sauvegarde et restauration
 docs/browser-engine.js       ZIP, empreintes, OPFS et reprise
 docs/browser-pcloud.js       API pCloud, nouvelles tentatives et vérification
 docs/vendor/                 zip.js et noble-hashes, versions figées, licences incluses
+extension/                   Extension MV3 : contrôle du bilan et commandes Google Photos
+scripts/package-extension.py Construction du ZIP installable publié sur Pages
 scripts/build-vendor.mjs     Construction reproductible du module distribué
 tests/browser-engine.test.mjs Tests de la migration navigateur et de son journal
 ```
@@ -156,9 +196,12 @@ Pour le développement uniquement :
 npm ci
 npm test
 npm run build:vendor
+python scripts/package-extension.py
 ```
 
 Les bibliothèques sont embarquées avec le site, pas chargées depuis un CDN externe. Le workflow exécute les tests, reconstruit le module et vérifie qu'il correspond à celui versionné avant publication Pages.
+
+Les tests de l’extension valident le dossier de contrôle produit par le vrai moteur, les refus de dossiers altérés/expirés et le parcours de commandes dans un monde JavaScript isolé de Chrome, avec une interface Google simulée et toutes les requêtes interceptées. `playwright-core` est une dépendance de développement uniquement. Ce test d’interface utilise Chrome/Chromium installé (`CHROME_PATH` permet de préciser son exécutable) ; il est signalé comme ignoré si aucun navigateur n’est disponible. Il ne valide pas la compatibilité avec un véritable compte Google ni le chargement manuel de l’extension depuis le gestionnaire Chrome.
 
 Les tests du moteur utilisent IndexedDB simulé, de vrais ZIP et un simulateur pCloud : perte de réponse, reprise sans source après réception, contrôle des empreintes, corruption CRC, homonymes, dates, compte incorrect, restauration et absence de jetons dans le journal exporté. Les contrôles navigateur utilisent le vrai IndexedDB et l'OPFS de Chrome, avec pCloud simulé pour les écritures. Les appels CORS pCloud sans authentification sont également vérifiés. **Aucun transfert vers un compte pCloud réel n'a été validé ici faute d'accès utilisateur.** Commencez par une petite partie Takeout.
 

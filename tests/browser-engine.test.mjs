@@ -8,6 +8,7 @@ import {sha256,bytesToHex} from '../docs/vendor/archive.js';
 import {BrowserPCloud,Retryable,AuthError} from '../docs/browser-pcloud.js';
 import {consumeCallback,sessionAuth} from '../docs/browser-auth.js';
 import {cleanupChecklist,AUDIT_LIFETIME} from '../docs/cleanup.js';
+import {validateProof} from '../extension/proof.js';
 
 async function zip(entries,name='takeout.zip',options={}){
   const writer=new ZipWriter(new BlobWriter(),{useWebWorkers:false});
@@ -41,6 +42,9 @@ test('Cleanup requires fresh full verification and every manual confirmation; re
   assert.equal(engine.snapshot().cleanup.ready,false);
   await engine.verify(signal);assert.equal(engine.snapshot().cleanup.ready,false);
   await engine.verify(signal,true);const state=engine.snapshot().cleanup;assert.equal(state.ready,true);
+  const dossier=await journal.backup();
+  dossier.cleanup_review={audit:engine.settings['cleanup-audit'],summary:{...engine.snapshot().database,archives:[...engine.archives.values()].map(row=>({...row,unverified_entries:0}))}};
+  assert.equal((await validateProof(dossier)).files,engine.objects.size);
   const confirmations={expectedParts:1,exportComplete:true,copiesReviewed:true,devicesReviewed:true,reportSaved:true,reportOffered:true};
   assert.equal(cleanupChecklist(state,confirmations).ready,true);
   for(const field of ['exportComplete','copiesReviewed','devicesReviewed','reportSaved','reportOffered'])assert.equal(cleanupChecklist(state,{...confirmations,[field]:false}).ready,false);

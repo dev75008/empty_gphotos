@@ -1,0 +1,10 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Passage Photos — nettoyage</title><link rel="stylesheet" href="popup.css"><script type="module" src="popup.js"></script></head>
+<body><header><strong>Passage Photos</strong><span>Nettoyage Google Photos</span></header>
+<p>Ouvrez le compte Google Photos à nettoyer, puis importez le dossier de contrôle téléchargé après la vérification intégrale sur le site.</p>
+<label for="proof">Dossier de contrôle JSON</label><input id="proof" type="file" accept=".json,application/json">
+<p id="proof-status" role="status">Aucun contrôle chargé.</p>
+<label for="email">Adresse exacte du compte Google à vider</label><input id="email" type="email" autocomplete="off" placeholder="vous@gmail.com">
+<label class="check"><input id="scope" type="checkbox">Je confirme que l’export couvre ce compte, que mes copies pCloud s’ouvrent et que j’ai conservé les ZIP. Les ajouts depuis l’export sont inclus.</label>
+<p>Les suppressions peuvent se répercuter sur vos appareils synchronisés. Le contrôle porte uniquement sur les ZIP fournis.</p>
+<button id="attach" disabled>Ouvrir les commandes dans cet onglet</button><p id="status" role="status"></p>
+<footer>Rien ne démarre à l’ouverture. Gardez l’onglet visible. Interface Google en français ou anglais. Arrêt si les éléments sont ambigus.</footer></body></html>

@@ -89,7 +89,8 @@
     <section id="errors-section" class="error-panel" hidden aria-labelledby="errors-title"><h2 id="errors-title">Fichiers à reprendre</h2><ul id="error-list"></ul></section>
     <section class="cleanup-panel" aria-labelledby="cleanup-title">
       <div class="section-heading"><h2 id="cleanup-title">Après le transfert : nettoyer Google Photos</h2><span id="cleanup-status" class="small">Contrôle requis</span></div>
-      <p>La suppression se fait dans Google Photos. Son API ne permet pas à cette page de supprimer votre bibliothèque.</p>
+      <p>La suppression se fait dans Google Photos. L’extension Chrome/Edge peut automatiser les clics après contrôle ; l’API Google ne propose pas cette suppression.</p>
+      <p class="small"><a href="./downloads/passage-photos-extension.zip" download>Télécharger l’extension Chrome/Edge</a> · <a href="https://github.com/dev75008/empty_gphotos#extension-de-nettoyage-chromeedge" target="_blank" rel="noopener noreferrer">Installation et mode d’emploi</a></p>
       <p class="small">Le contrôle porte sur les ZIP fournis. Vous devez confirmer que l’export couvre tout le compte à nettoyer, y compris les ajouts récents.</p>
       <div class="cleanup-controls"><button id="cleanup-audit-button" class="button secondary" disabled>Contrôler intégralement avant nettoyage</button><button id="cleanup-report-button" class="text-button" disabled>Télécharger le dossier de contrôle</button></div>
       <p id="cleanup-hint" class="small" role="status">Analysez et transférez vos archives Takeout.</p>
@@ -103,7 +104,7 @@
       <div class="cleanup-controls"><button id="cleanup-guide-button" class="button secondary" disabled>Afficher le guide de suppression</button><span id="cleanup-checklist-hint" class="small">Le guide sera disponible après les contrôles et confirmations.</span></div>
     </section>
     <details class="logs"><summary>Journal des opérations</summary><pre id="logs" tabindex="0">Les opérations apparaîtront ici.</pre></details>
-    <footer><p>Les fichiers Google restent en place. Rien n'est supprimé automatiquement.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
+    <footer><p>Le transfert conserve les fichiers Google. L’extension de nettoyage s’active séparément.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
   </main>
 
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">Trois étapes, puis le transfert.</h2><button id="close-help" class="text-button" aria-label="Fermer le mode d'emploi">Fermer</button></div>
@@ -119,6 +120,7 @@
   <dialog id="cleanup-dialog" aria-labelledby="cleanup-dialog-title"><div class="dialog-heading"><h2 id="cleanup-dialog-title">Supprimer dans Google Photos</h2><button id="cleanup-close" class="text-button">Fermer</button></div>
     <p id="cleanup-proof"></p>
     <p>Ce contrôle valide les fichiers fournis, pas la totalité de votre compte Google. Cette page n’exécute aucune suppression.</p>
+    <p>Pour automatiser les clics, <a href="./downloads/passage-photos-extension.zip" download>téléchargez l’extension Chrome/Edge</a>, installez-la selon le <a href="https://github.com/dev75008/empty_gphotos#extension-de-nettoyage-chromeedge" target="_blank" rel="noopener noreferrer">mode d’emploi</a>, puis importez-y votre dossier de contrôle. Testez un média, vérifiez le résultat, puis continuez par lots dans Photos et dans Archive. Le vidage définitif de la corbeille dispose d’une confirmation séparée.</p>
     <ol><li>Dans Google Photos, vérifiez l’adresse du <strong>compte Google correspondant à l’export</strong>.</li><li>Vérifiez les réglages de sauvegarde et les copies de vos téléphones et tablettes. Une suppression Google Photos peut se répercuter sur les appareils synchronisés.</li><li>Sélectionnez les photos et vidéos transférées, par lots, puis choisissez <strong>Placer dans la corbeille</strong>. Confirmez dans Google. Répétez pour les éléments restants, en vérifiant aussi les archives et dossiers concernés.</li><li>Conservez les éléments absents de votre export. N’utilisez pas le nombre de fichiers pCloud pour décider du nombre à supprimer : les JSON et la déduplication changent ce nombre.</li><li><strong>Ne videz pas immédiatement la corbeille.</strong> Vérifiez vos copies et le délai de restauration indiqué par Google. Une suppression définitive ne peut pas être annulée ; arrêtez-vous si Google la propose à cause d’une corbeille pleine.</li></ol>
     <a id="cleanup-open-google" class="button secondary" href="https://photos.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Photos pour supprimer manuellement</a>
     <p><a href="https://support.google.com/photos/answer/6128858?hl=fr&amp;co=GENIE.Platform%3DDesktop" target="_blank" rel="noopener noreferrer">Lire les consignes officielles de suppression Google</a></p>
