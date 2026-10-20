@@ -18,7 +18,7 @@ export function bytes(value) {
 }
 
 export function jobLabel(job) {
-  if (job.running) return {auth: 'Connexion', scan: 'Analyse', run: 'En cours', verify: 'Vérification'}[job.command] || 'En cours';
+  if (job.running) return {auth: 'Connexion', scan: 'Analyse', run: 'En cours', verify: 'Vérification', restore: 'Restauration'}[job.command] || 'En cours';
   if (job.paused) return 'En pause';
   if (job.exit_code !== null) return job.exit_code === 0 ? ({auth: 'Connexion prête', scan: 'Analyse terminée', run: 'Transfert terminé', verify: 'Contrôle terminé'}[job.command] || 'Terminé') : 'À reprendre';
   return 'En attente';

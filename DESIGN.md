@@ -10,6 +10,6 @@ Signature : le trajet Google Photos / archives Takeout / pCloud devient un petit
 
 Grille desktop : largeur maximale 1120 px = 680 px de préparation + 24 px d'espace + 416 px de suivi. Les deux régions se rangent en une seule colonne sous 900 px. Les marges mobiles sont de 20 px. Les contrôles mesurent au moins 44 px et conservent un focus visible.
 
-Le site est statique sur GitHub Pages. Un compagnon Python sur 127.0.0.1 lit les ZIP et garde SQLite et les secrets sur l'ordinateur. Chaque ouverture du compagnon crée une clé de session, transmise dans le fragment de l'URL et supprimée de la barre d'adresse. Le navigateur n'envoie jamais les photos à GitHub.
+Le site fonctionne entièrement dans le navigateur. OAuth pCloud utilise le flux token sans Client Secret ; le jeton reste dans la session de l'onglet. Le navigateur lit les ZIP, garde le journal dans IndexedDB et prépare un seul média dans OPFS. Un journal exportable remplace le SQLite du compagnon. Aucun programme local ni accès loopback n'est requis.
 
 Contrôle visuel : captures navigateur aux largeurs 1440, 768, 390 et 375 px, plus parcours connecté avec analyse d'un ZIP réel et mouvement réduit. Le panneau de suivi garde sa hauteur propre et reste collant sur ordinateur ; son bord inférieur ne s'aligne volontairement pas sur la préparation, afin de ne pas créer de vide artificiel dans le suivi. Aucun jeu de données fictif n'est publié.

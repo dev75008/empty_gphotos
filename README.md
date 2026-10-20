@@ -1,307 +1,151 @@
-# Google Photos vers pCloud : migration Takeout fiable
+# Passage Photos — Google Takeout vers pCloud, dans le navigateur
 
-## Lancer l'interface web
+**[Ouvrir l'application sur GitHub Pages](https://dev75008.github.io/empty_gphotos/)**
 
-L'interface est publiée sur **[Passage Photos](https://dev75008.github.io/empty_gphotos/)**.
+Aucune installation, aucun Python, aucun compagnon local pour la version web. La page lit les ZIP que vous choisissez, puis envoie leurs fichiers directement à pCloud. GitHub héberge le code de la page ; il ne reçoit pas vos photos, vos vidéos ni votre jeton pCloud.
 
-1. Sur le site, cliquez sur **Télécharger l'application**, puis décompressez le ZIP dans un dossier permanent.
-2. Installez **Python 3.11 ou supérieur** si nécessaire, avec l'option d'ajout au PATH.
-3. Double-cliquez sur **`Lancer-interface.cmd`**. Au premier lancement, il prépare l'environnement Python et installe les deux dépendances. Le site s'ouvre ensuite relié à votre ordinateur. Gardez la fenêtre du compagnon ouverte.
-4. Dans **Connecter pCloud**, ouvrez **Configurer mon application pCloud**. Créez votre application dans le portail pCloud, ajoutez l'URI affichée, puis saisissez et enregistrez Client ID et Client Secret. Ils sont enregistrés uniquement dans votre `config.json` local.
-5. Cliquez sur **Connecter mon compte pCloud** et autorisez l'accès dans le navigateur.
-6. Téléchargez vos ZIP depuis Google Takeout, puis cliquez sur **Choisir les ZIP** et **Analyser les archives**. Le bouton ouvre le sélecteur de fichiers de votre ordinateur. La saisie d'un chemin de dossier reste disponible si ce sélecteur ne fonctionne pas.
-7. Choisissez le nom du dossier pCloud et cliquez sur **Lancer le transfert**. Le nom est enregistré au lancement ; les fichiers vérifiés ne sont pas renvoyés à la reprise.
-8. Utilisez **Mettre en pause**, puis **Reprendre le transfert** si besoin. À la fin, cliquez sur **Vérifier les fichiers sur pCloud**, téléchargez le manifeste et le bilan, puis comparez les parties reçues à la liste Takeout.
+## Démarrer
 
-**GitHub Pages héberge uniquement l'interface.** Le compagnon Python écoute sur `127.0.0.1:8766`, lit les ZIP et envoie les médias directement à pCloud. Ni les photos, ni `config.json`, ni le journal de reprise ne sont envoyés à GitHub. Les communications avec le compagnon nécessitent une clé de session aléatoire et une origine autorisée. Cette clé est renouvelée à chaque lancement, transmise dans le fragment de l'URL (non envoyé à GitHub), puis retirée de la barre d'adresse. Elle est gardée dans la session de l'onglet pour permettre le rechargement de la page.
+Utilisez **Chrome ou Edge récent sur ordinateur**, hors navigation privée.
 
-Si Chrome ou Edge demande l'accès au réseau local, autorisez-le pour cette interface. Si votre navigateur bloque la liaison depuis GitHub Pages, utilisez **`Lancer-interface-locale.cmd`** : il ouvre exactement la même interface, servie entièrement sur votre ordinateur. Ne désactivez pas les protections du navigateur. La vue mobile permet de consulter le site, mais le compagnon et les ZIP doivent être sur le même ordinateur que le navigateur qui pilote la migration.
+1. Ouvrez [Passage Photos](https://dev75008.github.io/empty_gphotos/).
+2. Dans **Connecter pCloud**, ouvrez **Configurer mon application pCloud**.
+3. Connectez-vous au portail [pCloud Developers / My Apps](https://docs.pcloud.com/my_apps/) et créez une application personnelle.
+4. Ajoutez exactement cette URI aux redirections autorisées :
 
-Après fermeture du navigateur, le transfert continue tant que le compagnon reste ouvert. Fermer le compagnon interrompt l'opération en cours ; les transactions déjà validées sont conservées. Relancez le même fichier `.cmd` dans le même dossier pour reprendre. Une pause coupe l'envoi du fichier en cours ; la reprise le réconcilie avec pCloud et, s'il n'est pas arrivé en entier, le renvoie depuis le début.
+   ```text
+   https://dev75008.github.io/empty_gphotos/
+   ```
 
-Si le dossier principal est renommé sur pCloud, la destination conserve son identifiant. L'interface affiche le nom initial du journal et indique que le renommage se fait directement dans pCloud.
+5. Copiez le **Client ID / App Key public** dans le champ du site et enregistrez-le. **Aucun Client Secret n'est demandé ni utilisé.**
+6. Cliquez sur **Connecter mon compte pCloud**, puis autorisez votre application sur la page pCloud. Vous revenez automatiquement à l'interface.
+7. Cliquez sur **Choisir les ZIP**, sélectionnez vos archives Takeout sans les décompresser, puis cliquez sur **Analyser les archives**.
+8. Saisissez le nom du dossier pCloud, puis cliquez sur **Lancer le transfert**.
 
-Pour lancer depuis un terminal, ou réutiliser un journal situé ailleurs :
+Le flux OAuth pCloud `response_type=token` est celui documenté pour les applications entièrement côté navigateur. Le retour vérifie un `state` aléatoire et sa durée de validité ; le serveur US/Europe est contrôlé contre une liste fermée. Le jeton est immédiatement retiré du fragment de l'URL et gardé dans `sessionStorage`, séparément du journal et du code. Il n'est jamais exporté dans les rapports. Un Client ID n'est pas un secret. [Documentation OAuth pCloud](https://docs.pcloud.com/methods/oauth_2.0/authorize.html).
 
-```powershell
-.\.venv\Scripts\python.exe -m photos_pcloud web
-# Interface entièrement locale, sans liaison entre origines :
-.\.venv\Scripts\python.exe -m photos_pcloud web --local
-# Avec un journal existant :
-.\.venv\Scripts\python.exe -m photos_pcloud --state "C:\Prive\migration.sqlite3" web
-```
+Si le portail pCloud affiche une erreur de redirection, vérifiez l'URI exacte, notamment le slash final. Une révocation de l'autorisation nécessite une nouvelle connexion ; pCloud ne fournit pas de jeton de renouvellement dans ce flux.
 
-Le moteur CLI reste utilisable avec les commandes ci-dessous. Les deux interfaces utilisent le même SQLite. Ne lancez pas simultanément une opération CLI et une opération web sur le même journal.
+## Obtenir toute la bibliothèque Google Photos
 
-## Application et garanties
+Google Photos Library API ne permet plus d'énumérer une photothèque existante depuis les restrictions entrées en vigueur en mars 2025. Elle est limitée aux contenus créés par l'application. Picker exige une sélection explicite et les vidéos téléchargées par son API sont transcodées. La solution implémentée utilise donc **Google Takeout**. Aucun projet Google Cloud ni identifiant OAuth Google n'est requis. [Changements Google](https://developers.google.com/photos/support/updates), [Picker](https://developers.google.com/photos/picker/guides/media-items).
 
-Application Python en ligne de commande, conçue pour une photothèque plus grande que le disque local. Elle lit les fichiers directement dans des ZIP Google Takeout et les envoie à pCloud. Elle n'efface aucun fichier source ni distant.
+1. Ouvrez [Google Takeout](https://takeout.google.com/).
+2. Désélectionnez tout, puis sélectionnez **Google Photos** et toutes les années/albums souhaités.
+3. Demandez un export unique au format **ZIP**, livré par lien de téléchargement.
+4. Choisissez des parties de **2 ou 4 Go** si votre disque est limité.
+5. Notez le nombre total et les noms des parties annoncées par Google.
+6. Téléchargez les ZIP. Attendez la fin du téléchargement ; ne les décompressez pas.
 
-## Pourquoi Takeout, et pas une connexion Google Photos OAuth ?
+Le téléchargement des ZIP se fait dans le navigateur via la page Google. L'application n'automatise ni cette connexion ni ces liens authentifiés. Les liens Takeout expirent généralement après environ sept jours, avec un nombre limité de téléchargements par archive. [Aide Google Takeout](https://support.google.com/accounts/answer/3024190?hl=fr).
 
-Documentation officielle consultée le **20 octobre 2026** :
+Les octets exportés sont conservés sans conversion ni recompression. Takeout ne peut pas restituer un original antérieur si Google ne conserve qu'une version compressée par « Économiseur de stockage ». L'export peut omettre des éléments seulement partagés, non enregistrés dans votre bibliothèque, et des changements intervenus après sa demande. Contrôlez le périmètre de votre export dans Google.
 
-- Depuis le 31 mars 2025, Google Photos Library API limite la lecture aux contenus créés par l'application. Les anciennes portées `photoslibrary.readonly`, `photoslibrary` et `photoslibrary.sharing` ont été supprimées. Créer un nouveau projet Google Cloud ne permet donc pas de lire votre photothèque existante. [Changements Google](https://developers.google.com/photos/support/updates), [notes de version](https://developers.google.com/photos/support/release-notes).
-- Picker API donne accès aux éléments que vous sélectionnez explicitement. Elle ne fournit pas l'énumération automatique de tout le compte. Les téléchargements de vidéos utilisent une version transcodée de haute qualité ; les images téléchargées via les URL d'API ne conservent pas toutes les métadonnées, notamment la localisation. Ces caractéristiques ne conviennent pas à une sauvegarde exhaustive des originaux. [Picker et téléchargements](https://developers.google.com/photos/picker/guides/media-items), [paramètres des téléchargements](https://developers.google.com/photos/library/guides/access-media-items).
-- **Takeout est la voie implémentée.** L'application conserve exactement les octets exportés, sans recompression ni conversion. Une image déjà compressée par « Économiseur de stockage » ne retrouve pas son original antérieur. [Export des données Google](https://support.google.com/accounts/answer/3024190?hl=fr).
+## Interrompre et reprendre
 
-**Aucun projet Google Cloud, identifiant OAuth Google, activation de facturation ou secret Google n'est nécessaire.** Vous vous connectez à Google dans votre navigateur pour demander et télécharger Takeout. Une connexion Google OAuth dans cette application promettrait un accès qu'elle ne peut pas obtenir.
+- Pendant le transfert, gardez **cet onglet ouvert** et l'ordinateur éveillé. Le site demande un verrou de veille si le navigateur le permet, mais ne garantit pas une exécution en arrière-plan.
+- **Mettre en pause** interrompt le fichier en cours. Les transactions du journal déjà validées sont conservées.
+- Après rechargement ou fermeture, ouvrez la même URL avec **le même navigateur et le même profil**.
+- Reconnectez pCloud si la session a expiré, puis **sélectionnez de nouveau les ZIP nécessaires**. Le navigateur ne peut pas rouvrir des fichiers privés sans votre sélection.
+- Cliquez sur **Reprendre le transfert**. Les objets déjà vérifiés ne sont ni relus dans les ZIP ni renvoyés. Si un envoi avait été reçu mais sa réponse perdue, son contenu est d'abord retrouvé et vérifié sur pCloud.
 
-## Ce qui assure la reprise
+La reprise se fait **au fichier**, pas à l'octet. Une vidéo interrompue avant réception complète repart du début. La fermeture du navigateur arrête le traitement : GitHub Pages n'exécute aucun transfert à votre place.
 
-1. `scan` lit entièrement chaque entrée ZIP. Python vérifie son CRC ; l'application calcule SHA-256, SHA-1 et la taille. Chaque entrée est enregistrée dans SQLite avant de passer à la suivante.
-2. Les fichiers dont les octets sont identiques partagent un seul objet distant, même s'ils apparaissent dans plusieurs albums Takeout. Toutes les provenances restent dans le manifeste CSV.
-3. Chaque objet dispose d'un sous-dossier déterministe nommé par son SHA-256 complet. Le nom du fichier reste celui de la première occurrence rencontrée. Deux fichiers différents appelés `IMG_0001.jpg` occupent deux sous-dossiers différents.
-4. Avant tout envoi ou nouvel essai, l'application inspecte le sous-dossier. Si le fichier est déjà arrivé, elle vérifie son contenu et reprend sans le renvoyer. Cela couvre une réponse perdue et un arrêt entre l'envoi et l'enregistrement local.
-5. `nopartial=1` demande à pCloud de ne pas conserver un envoi incomplet. L'envoi vise toujours le même nom ; aucun renommage automatique en `photo (2).jpg` n'est demandé. Un contenu distant inattendu provoque une erreur, jamais un écrasement volontaire.
-6. Un fichier devient `verified` seulement après contrôle de sa taille et de ses empreintes distantes. En Europe, pCloud fournit SHA-256. Aux États-Unis, le programme relit le fichier distant en flux pour calculer SHA-256, car pCloud n'y fournit que SHA-1/MD5.
-7. Le compte, la région et l'identifiant du dossier destination sont liés au journal. Vous pouvez **renommer le dossier principal sur pCloud** : la reprise utilise son identifiant, pas son chemin.
+Le journal est dans **IndexedDB**, sous le nom `passage-photos-browser-v1`. Le bouton **Protéger le journal de reprise** demande au navigateur un stockage persistant. Ce droit peut être refusé. Même accordé, il ne protège pas contre une suppression manuelle des données du site, la perte du profil ou une panne de disque.
 
-Les appels API de lecture ont des tentatives automatiques. Un upload interrompu rouvre son entrée ZIP et commence par une réconciliation distante. Les délais augmentent, avec un aléa, et respectent `Retry-After` jusqu'à une heure. Une panne persistante arrête le programme avec un code non nul pour éviter de répéter la panne sur tous les fichiers.
+**Sauvegardez régulièrement le journal de reprise en JSON**, conservez-le hors des données du navigateur et gardez les ZIP jusqu'à validation. **Restaurer un journal** permet de le réimporter, y compris dans un autre profil. Une restauration remet les objets en attente afin de vérifier à nouveau leur présence distante ; elle ne les renvoie pas s'ils sont retrouvés intacts. Le jeton pCloud ne figure jamais dans cette sauvegarde.
 
-La structure pCloud est volontairement orientée fiabilité :
+Le journal du navigateur et le SQLite de l'ancienne version Python sont indépendants. Le navigateur n'importe pas les fichiers SQLite. La structure distante des contenus reste compatible : un fichier déjà présent dans le même dossier déterministe est vérifié avant tout nouvel envoi.
+
+## Fiabilité et absence de doublons
+
+1. Chaque entrée du ZIP est lue en flux, contrôlée par **CRC**, puis identifiée par **SHA-256, SHA-1 et taille**. Les ZIP64 sont pris en charge par zip.js ; pas les ensembles de volumes `.z01`/`.zip.001` ni les ZIP chiffrés.
+2. L'objet et sa provenance sont enregistrés ensemble dans une transaction IndexedDB à durabilité stricte. Une archive interrompue reste incomplète et bloque le transfert jusqu'à la fin de son analyse.
+3. Des octets identiques, y compris les copies d'albums, partagent un seul objet. Les provenances et noms originaux restent dans le manifeste.
+4. Un sous-dossier déterministe utilise le SHA-256 complet :
+
+   ```text
+   Dossier choisi/Fichiers/ab/ab...SHA256 complet.../IMG_0001.jpg
+   ```
+
+5. Avant chaque envoi et chaque tentative, le programme inspecte ce sous-dossier. S'il contient le fichier attendu, son contenu est contrôlé puis validé. Un contenu différent provoque une erreur sans écrasement volontaire.
+6. L'envoi utilise `nopartial=1` et le même nom déterministe, sans création automatique de noms `photo (2).jpg`. La présence distante est réconciliée après une réponse perdue.
+7. Un objet est marqué **vérifié** uniquement après comparaison de sa taille et de ses empreintes. En Europe, pCloud fournit SHA-256. Aux États-Unis, la page relit le téléchargement distant pour calculer SHA-256. **Relire aussi tous les octets distants** impose cette relecture même en Europe.
+8. Un verrou Web Locks empêche deux onglets de cette application d'effectuer simultanément des opérations sur le même journal. Le compte pCloud et sa région sont liés à la destination.
+
+Le dossier principal reste suivi par son `folderid`. Vous pouvez le renommer librement sur pCloud. L'interface conserve son nom initial à titre indicatif. Ne supprimez ni ne réorganisez les sous-dossiers techniques pendant la migration. Évitez d'écrire dans cette destination depuis un autre outil pendant les envois : pCloud ne fournit pas ici de verrou distribué ni d'écriture conditionnelle.
+
+Cette structure crée beaucoup de sous-dossiers et ne reproduit pas les albums comme fonctionnalités pCloud. C'est le compromis qui conserve les homonymes tout en rendant les envois idempotents. Les noms ordinaires et accents sont conservés ; caractères interdits et noms dépassant 1000 octets UTF-8 sont adaptés. Le manifeste conserve le chemin original exact.
+
+## Disque, mémoire et gros volumes
+
+Les ZIP choisis sont lus par tranches, sans charger une archive complète en mémoire ni l'extraire entièrement.
+
+Pour envoyer un média, la page en prépare **un seul à la fois** dans l'espace disque privé du navigateur (OPFS). Le fichier temporaire est contrôlé contre l'inventaire avant envoi, puis supprimé de cet espace. Après un arrêt brutal, ce temporaire est nettoyé au début de l'opération suivante. Vos ZIP source ne sont jamais modifiés ni effacés.
+
+Il faut donc la place des ZIP téléchargés, du journal, et du **plus gros fichier individuel**. Le quota disque accordé au site peut être inférieur à l'espace libre total de l'ordinateur. Une insuffisance de quota provoque un arrêt sûr, pas une validation du fichier.
+
+Sans OPFS, le mode de secours garde un seul fichier en mémoire avec une limite de **128 Mo par fichier**. Utilisez Chrome ou Edge récent pour les grosses vidéos. Les métadonnées ZIP et le journal augmentent avec le nombre de fichiers ; aucune promesse de RAM strictement constante n'est faite.
+
+Si toute la bibliothèque ne tient pas localement, traitez les parties une à une : choisissez une partie, analysez, transférez, vérifiez, puis sauvegardez le journal et libérez la place en déplaçant cette partie sur un disque de sauvegarde. Le journal garde les parties précédentes. Les données de date ajoutées par une partie ultérieure ne modifient pas rétroactivement la date d'un fichier déjà vérifié.
+
+## Dates et métadonnées
+
+- Aucun média n'est réencodé. EXIF, RAW et pistes vidéo présents dans l'export restent inchangés.
+- Les JSON Takeout sont transférés comme les autres fichiers.
+- Les JSON d'au plus 4 Mo contenant `photoTakenTime.timestamp` sont associés par répertoire et titre exacts. Une date univoque renseigne `ctime` et `mtime` pCloud au premier envoi.
+- Noms tronqués, associations ambiguës et dates contradictoires ne sont pas devinés ; les JSON originaux restent disponibles. Une absence de date laisse la date d'envoi pCloud.
+- Les corrections de dates faites uniquement dans Google Photos peuvent exister seulement dans les JSON. La page ne réécrit pas les EXIF.
+- Albums, reconnaissance faciale, favoris et partages ne sont pas recréés comme fonctions pCloud. Live Photos, Motion Photos et autres fichiers sont conservés tels qu'exportés, sans recomposition.
+
+## Vérifier l'arrivée de tous les fichiers
+
+1. Cliquez sur **Vérifier les fichiers sur pCloud**. Activez la relecture de tous les octets pour un contrôle supplémentaire.
+2. Exigez zéro fichier restant/en erreur et un contrôle terminé sans message d'échec.
+3. Téléchargez le **bilan JSON**. Chaque archive doit être complète et avoir `unverified_entries: 0`.
+4. Comparez la liste des archives avec **toutes les parties annoncées par Google Takeout**.
+5. Téléchargez le **manifeste CSV**, qui associe chaque provenance à son SHA-256, sa taille, son statut et son `fileid` pCloud.
+6. Ouvrez manuellement un échantillon de photos, RAW et vidéos reçus, puis conservez le journal de reprise exporté.
+
+Les compteurs portent sur les fichiers uniques, y compris les JSON. Leur nombre n'est donc pas directement comparable au compteur de photos Google. Un bilan ne prouve que le transfert des ZIP fournis, jamais la complétude de ce que Google a choisi d'exporter.
+
+## Limites réseau et erreurs
+
+- Les appels pCloud utilisent HTTPS et des requêtes POST. Aucun jeton n'est placé dans une URL d'API ni envoyé à GitHub. Aucun proxy tiers n'est utilisé.
+- Les API US et Europe répondent aux requêtes inter-origines testées. La disponibilité des téléchargements signés pour une relecture dépend aussi des règles CORS des serveurs de téléchargement pCloud. Si cette relecture est bloquée, la page indique un échec et **ne déclare pas le fichier vérifié**.
+- Les erreurs transitoires ont six tentatives avec attente exponentielle et respect de `Retry-After` jusqu'à une heure. Un envoi ambigu est réconcilié avant sa nouvelle tentative. Les coupures durables, quotas saturés, jetons refusés et conflits sont visibles dans le journal.
+- Une application navigateur ne peut pas renouveler un droit OAuth révoqué. Reconnectez pCloud pour reprendre.
+- `Lancer le transfert` ignore les fichiers déjà vérifiés. Utilisez le contrôle final pour détecter une suppression ou corruption distante ultérieure.
+- Pas de pCloud Crypto, pas de synchronisation continue, pas de récupération de corbeille Google et aucune suppression automatique de vos sources.
+- La navigation privée, l'effacement des données du site et le changement de profil peuvent faire perdre le journal local. Conservez son export.
+- Aucune garantie contre la perte d'un compte ou une panne de stockage : gardez plusieurs copies jusqu'à la validation finale.
+
+À 10 Mbit/s d'envoi, 1 To décimal nécessite environ **9,3 jours** de transmission seule ; à 100 Mbit/s, environ **22,2 heures**. Ajoutez le téléchargement Takeout, la préparation locale, la latence des appels, les reprises et les relectures distantes. Un volume de dizaines de milliers de petits fichiers peut être surtout limité par la latence et le nombre d'appels pCloud. Les 2 To du compte doivent être effectivement libres ; aucun quota d'appels fixe n'est supposé.
+
+## Code et validation
 
 ```text
-Nom choisi/
-  Fichiers/
-    ab/
-      ab...SHA256 complet sur 64 caractères.../
-        IMG_0001.jpg
+docs/index.html              Interface GitHub Pages
+docs/app.js                  Actions utilisateur, états, exports
+docs/browser-auth.js         OAuth pCloud navigateur, sans Client Secret
+docs/browser-state.js        IndexedDB, sauvegarde et restauration
+docs/browser-engine.js       ZIP, empreintes, OPFS et reprise
+docs/browser-pcloud.js       API pCloud, nouvelles tentatives et vérification
+docs/vendor/                 zip.js et noble-hashes, versions figées, licences incluses
+scripts/build-vendor.mjs     Construction reproductible du module distribué
+tests/browser-engine.test.mjs Tests de la migration navigateur et de son journal
 ```
 
-Cela crée beaucoup de sous-dossiers et ne reproduit pas les albums dans l'interface pCloud. Le manifeste conserve les chemins d'albums Takeout. C'est le compromis retenu pour garder les noms, dédupliquer les copies d'albums et rendre les envois idempotents. Les JSON et autres fichiers exportés utilisent le même rangement ; aucun type de fichier n'est silencieusement ignoré.
+Pour le développement uniquement :
 
-## Installation sous Windows
-
-1. Installez Python **3.11 ou supérieur** depuis [python.org](https://www.python.org/downloads/). Cochez l'ajout de Python au PATH. Le développement et les tests locaux ont utilisé Python 3.14 sous Windows.
-2. Copiez tout ce dossier, y compris `photos_pcloud`, `requirements.txt` et `config.example.json`, dans un emplacement permanent.
-3. Ouvrez PowerShell dans ce dossier. Exécutez :
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-Copy-Item config.example.json config.json
+```sh
+npm ci
+npm test
+npm run build:vendor
 ```
 
-Les exemples appellent Python directement dans l'environnement : aucune modification de la politique d'exécution PowerShell n'est nécessaire.
+Les bibliothèques sont embarquées avec le site, pas chargées depuis un CDN externe. Le workflow exécute les tests, reconstruit le module et vérifie qu'il correspond à celui versionné avant publication Pages.
 
-Sous Linux/macOS, utilisez `python3 -m venv .venv`, puis `.venv/bin/python` à la place de `.\.venv\Scripts\python.exe`. Le verrouillage POSIX est implémenté, mais ces systèmes n'ont pas été testés ici.
+Les tests du moteur utilisent IndexedDB simulé, de vrais ZIP et un simulateur pCloud : perte de réponse, reprise sans source après réception, contrôle des empreintes, corruption CRC, homonymes, dates, compte incorrect, restauration et absence de jetons dans le journal exporté. Les contrôles navigateur utilisent le vrai IndexedDB et l'OPFS de Chrome, avec pCloud simulé pour les écritures. Les appels CORS pCloud sans authentification sont également vérifiés. **Aucun transfert vers un compte pCloud réel n'a été validé ici faute d'accès utilisateur.** Commencez par une petite partie Takeout.
 
-## Créer l'application pCloud et se connecter
-
-1. Connectez-vous à votre compte dans [pCloud Developers / My Apps](https://docs.pcloud.com/my_apps/).
-2. Créez une application personnelle. Donnez-lui un nom, par exemple `Migration Takeout personnelle`, et renseignez les informations demandées par le portail.
-3. Dans les URI de redirection autorisées de cette application, ajoutez exactement :
-
-```text
-http://127.0.0.1:8765/callback
-```
-
-4. Copiez le **Client ID / App Key** et le **Client Secret** dans `config.json`. Conservez le reste :
-
-```json
-{
-  "client_id": "votre identifiant",
-  "client_secret": "votre secret",
-  "redirect_uri": "http://127.0.0.1:8765/callback",
-  "hostname": "eapi.pcloud.com",
-  "access_token": "",
-  "attempts": 6
-}
-```
-
-5. Lancez :
-
-```powershell
-.\.venv\Scripts\python.exe -m photos_pcloud auth
-```
-
-6. Votre navigateur ouvre pCloud. Connectez-vous et autorisez votre application. Revenez au terminal après la redirection locale. L'application enregistre le jeton dans `config.json` et vérifie le compte avec `userinfo`.
-
-Le serveur de callback écoute exclusivement sur `127.0.0.1`, pendant cinq minutes. Le paramètre OAuth `state` est vérifié. Le serveur API US ou Europe est obtenu du callback et contrôlé contre une liste fermée. Il n'y a aucun mot de passe pCloud à renseigner dans le programme.
-
-Si le port est occupé, choisissez un autre port dans **les deux endroits** : portail pCloud et `config.json`. Si le portail refuse une URI locale HTTP pour votre type d'application, ne la remplacez pas par un site tiers : vérifiez les réglages de l'application auprès de pCloud. Ce flux dépend de l'acceptation de cette URI par leur portail.
-
-Le flux pCloud documenté ne fournit pas de `refresh_token`. Si le jeton est révoqué, invalide ou expiré, le programme s'arrête : relancez `auth`, puis `run` avec le même journal. Il ne peut pas renouveler automatiquement un droit supprimé. [Autorisation OAuth](https://docs.pcloud.com/methods/oauth_2.0/authorize.html), [échange du code](https://docs.pcloud.com/methods/oauth_2.0/oauth2_token.html).
-
-### Protéger les secrets
-
-`config.json` contient le secret d'application et le jeton d'accès. Il est séparé du code et exclu de Git. Ne le partagez jamais. Il n'est pas chiffré par l'application. Utilisez un compte Windows personnel et BitLocker si disponible.
-
-Vous pouvez limiter les droits NTFS après avoir créé le fichier :
-
-```powershell
-$migrationIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-icacls .\config.json /inheritance:r /grant:r "${migrationIdentity}:(F)"
-```
-
-La sauvegarde OAuth remplace le fichier atomiquement. Pour que les remplacements héritent également de droits restreints, conservez toute l'application dans un dossier personnel auquel les autres comptes n'ont pas accès. Sous POSIX, le fichier écrit par `auth` reçoit le mode `0600`.
-
-Le journal et les rapports contiennent des noms, des dates, des identifiants pCloud et des empreintes : ce sont aussi des données personnelles.
-
-## Demander Google Takeout
-
-1. Ouvrez [Google Takeout](https://takeout.google.com/) et connectez-vous au compte Google concerné.
-2. Cliquez sur **Tout désélectionner**, puis cochez uniquement **Google Photos**.
-3. Ouvrez le choix des albums et vérifiez que toutes les années et tous les albums souhaités sont inclus. Vérifiez séparément les éléments partagés et les éléments du dossier verrouillé selon les possibilités actuelles de votre compte. Un élément seulement partagé, non enregistré dans votre bibliothèque, n'est pas une garantie d'export.
-4. Choisissez **Exporter une fois**, la livraison par lien de téléchargement et le format **ZIP**. N'utilisez pas TGZ avec ce programme.
-5. Choisissez des parties de **2 Go** ou **4 Go** si le disque est petit. Les parties sont des ZIP indépendants ; ce programme ne traite pas les archives multi-volumes `.z01`/`.zip.001`.
-6. Créez l'export. Sa préparation peut prendre des heures ou des jours.
-7. Sur la page de téléchargement Google, notez le **nombre total de parties** et leur nom. Ce relevé permet de détecter une partie oubliée.
-8. Téléchargez les ZIP dans un dossier, par exemple `D:\Takeout`. Attendez la fin du téléchargement avant `scan`. **Ne les décompressez pas et ne les modifiez pas.**
-
-Les liens Takeout expirent généralement après environ sept jours ; chaque archive n'est téléchargeable qu'un nombre limité de fois, indiqué par Google comme cinq. Organisez le téléchargement en conséquence. L'application n'automatise pas la connexion Google ni le téléchargement de ces liens authentifiés. [Aide Google](https://support.google.com/accounts/answer/3024190?hl=fr).
-
-## Inventorier, transférer, reprendre
-
-### Si tous les ZIP tiennent sur le disque
-
-```powershell
-# Lecture complète et contrôle des ZIP. Aucun accès à pCloud.
-.\.venv\Scripts\python.exe -m photos_pcloud scan "D:\Takeout"
-
-# Saisissez le nom du dossier à l'invite.
-.\.venv\Scripts\python.exe -m photos_pcloud run
-
-# Ou fournissez le nom initial explicitement.
-# .\.venv\Scripts\python.exe -m photos_pcloud run --folder "Ma phototheque"
-```
-
-Le programme affiche chaque fichier en cours et sa taille, la progression en octets pour les gros fichiers, puis les compteurs globaux tous les 25 objets. Le résumé final distingue les objets vérifiés, restants et en erreur. Les compteurs incluent les JSON et autres fichiers, et excluent les copies dédupliquées.
-
-Interrompez avec `Ctrl+C`. Pour reprendre :
-
-```powershell
-.\.venv\Scripts\python.exe -m photos_pcloud run
-```
-
-Les objets déjà vérifiés ne sont ni relus dans les ZIP ni renvoyés. **Gardez le même `migration.sqlite3`.** Une coupure électrique ne supprime pas les transactions SQLite déjà validées ; l'envoi en cours est réconcilié à la reprise.
-
-Après avoir renommé le dossier principal dans pCloud, relancez `run` sans `--folder`. Le nom initial n'est plus utilisé pour localiser la destination. Ne supprimez pas ce dossier et ne réorganisez pas ses sous-dossiers techniques pendant la migration. Le programme ne fait pas de suppression distante.
-
-### Si un seul ZIP tient sur le disque
-
-Pour chaque partie, en gardant **le même journal et la même configuration** :
-
-```powershell
-.\.venv\Scripts\python.exe -m photos_pcloud scan "D:\Takeout\takeout-001.zip"
-.\.venv\Scripts\python.exe -m photos_pcloud run
-.\.venv\Scripts\python.exe -m photos_pcloud verify
-```
-
-Consultez `reports/summary.json`. Pour cette archive, `complete` doit valoir `1` et `unverified_entries` doit valoir `0`. Les commandes `run` et `verify` doivent terminer avec le code `0` (`$LASTEXITCODE` sous PowerShell).
-
-Vous pouvez alors déplacer ce ZIP sur un disque de sauvegarde pour libérer la place locale, puis télécharger la partie suivante. **N'effacez pas votre seule copie exportée avant d'avoir une autre sauvegarde ou d'avoir accepté de dépendre de Google et pCloud.** Le programme n'efface rien automatiquement. Il conserve l'inventaire des parties précédentes même si leur ZIP est absent.
-
-L'espace supplémentaire utilisé pour les médias transférés est nul : lecture ZIP, envoi et éventuelle relecture pCloud se font en flux. Il faut néanmoins la place du ZIP téléchargé, du journal SQLite, de ses fichiers WAL et des rapports. La RAM contient les tables ZIP et quelques tampons ; elle n'est pas strictement constante avec le nombre d'entrées, mais aucun média complet n'y est chargé.
-
-Les JSON d'une partie suivante peuvent compléter les dates des médias **pas encore transférés**. Le programme ne renvoie pas un média déjà vérifié pour modifier sa date pCloud. Pour maximiser la restitution des dates, inventoriez toutes les parties avant `run` si vous disposez d'un disque externe suffisant.
-
-### Emplacements personnalisés
-
-Les options globales se placent **avant** la commande :
-
-```powershell
-.\.venv\Scripts\python.exe -m photos_pcloud --config "C:\Prive\config.json" --state "C:\Prive\migration.sqlite3" --reports "C:\Prive\rapports" run
-```
-
-Utilisez ensuite ces mêmes options pour toutes les commandes. Les chemins par défaut sont relatifs au dossier courant. Ne lancez pas deux migrations vers la même destination avec des journaux différents. Le verrou empêche deux processus d'utiliser le même journal ; il ne fournit pas de verrou distribué entre plusieurs ordinateurs.
-
-## Dates, noms et métadonnées
-
-- Les octets des photos et vidéos restent inchangés : EXIF, contenu RAW et pistes vidéo présents dans l'export sont conservés.
-- Si un JSON Takeout contient `photoTakenTime.timestamp`, le programme associe la date par **répertoire et titre exacts**, y compris entre parties ZIP. Il renseigne les dates de création et modification pCloud lors du premier envoi. [Paramètres pCloud `ctime`/`mtime`](https://docs.pcloud.com/methods/file/uploadfile.html).
-- Les noms tronqués ou divergents et les dates contradictoires ne sont pas devinés. Sans correspondance certaine, la date pCloud reste celle de l'envoi. `media_without_date` dans le résumé signale les médias sans date associée. Les métadonnées source restent dans les JSON transférés.
-- Les JSON de plus de 4 Mio sont transférés, mais ne sont pas analysés pour les dates.
-- Un changement de date fait uniquement dans Google Photos peut n'exister que dans le JSON ; l'application ne réécrit pas l'EXIF, afin de préserver les octets originaux exportés.
-- En cas de déduplication, le premier nom est conservé. Les autres noms et appartenances d'albums restent dans `manifest.csv`.
-- Les noms ordinaires, accents et extensions sont conservés. Les caractères de contrôle, barres obliques inverses et noms dépassant 1000 octets UTF-8 sont échappés ou raccourcis. Le nom exact exporté reste dans la colonne `member`.
-- Favoris, reconnaissance faciale, commentaires, partages et albums Google ne sont pas recréés comme fonctions pCloud. Leurs informations sont conservées uniquement si Takeout les exporte dans les fichiers associés. Live Photos, Motion Photos et montages sont transférés tels qu'exportés ; aucune recomposition n'est tentée.
-
-## Vérifier la migration
-
-```powershell
-# Vérification distante de chaque objet : taille, SHA-1 et SHA-256.
-.\.venv\Scripts\python.exe -m photos_pcloud verify
-
-# Preuve supplémentaire : relire tous les octets distants, même en Europe.
-.\.venv\Scripts\python.exe -m photos_pcloud verify --deep
-
-# Résumé local et régénération des rapports, sans réseau.
-.\.venv\Scripts\python.exe -m photos_pcloud status
-```
-
-`verify --deep` lit les téléchargements distants en mémoire par blocs. Il n'écrit pas de copie locale. Aux États-Unis, cette relecture SHA-256 est déjà nécessaire pour `verify` et après chaque premier envoi. [Empreintes fournies par pCloud](https://docs.pcloud.com/methods/file/checksumfile.html).
-
-Contrôle final :
-
-1. Comparez les parties dans `summary.json` avec la liste de téléchargement Takeout. Toutes doivent avoir été inventoriées ; aucune ne doit rester à `complete: 0`.
-2. Exigez `unverified_entries: 0` pour chaque partie, aucun objet `pending`, `uploading` ou `error`, et un code de sortie `0` pour le dernier `verify`.
-3. Ouvrez `manifest.csv` : une ligne correspond à chaque fichier source exporté ; les copies identiques partagent SHA-256 et `fileid`. Les colonnes donnent taille, dates associées, statut, identifiants distants et dernier contrôle réussi.
-4. Téléchargez et ouvrez manuellement quelques photos, RAW, longues vidéos et éléments anciens/récents depuis pCloud. Vérifiez aussi les dates et noms d'un échantillon.
-5. Gardez le journal et les rapports. Sauvegardez le journal lorsque le programme est arrêté. Si vous le copiez pendant un transfert, il faut aussi une sauvegarde SQLite cohérente de son WAL ; ne copiez pas seulement le fichier principal.
-
-Les rapports prouvent le transfert des **fichiers fournis**. Ils ne peuvent pas prouver que Google a exporté tous les éléments du compte. Un export est un instantané : les ajouts ultérieurs et certaines modifications pendant sa préparation peuvent manquer. Le nombre d'objets pCloud peut être inférieur aux entrées Takeout, à cause de la déduplication, ou supérieur au compteur de photos Google à cause des JSON et fichiers associés.
-
-Codes de sortie : `0` succès de la commande, `2` échec ou migration incomplète, `130` interruption utilisateur. `status` réussit même s'il décrit une migration incomplète : utilisez `verify` pour le contrôle final.
-
-## Erreurs et récupération
-
-| Situation | Comportement / action |
-|---|---|
-| Réseau, HTTP 429/5xx, erreur serveur transitoire | Tentatives bornées avec attente. Après arrêt, relancez `run`. |
-| Jeton refusé | `auth`, puis `run`, sans changer de journal. |
-| Espace pCloud insuffisant | Libérez de l'espace ou augmentez la capacité, puis reprenez. Les 2 To annoncés ne sont pas forcément tous libres. |
-| ZIP absent pour un objet restant | Remettez-le à disposition et lancez `scan` sur son nouveau chemin, puis `run`. |
-| ZIP déplacé | `scan` retrouve son identifiant par l'inventaire interne et actualise le chemin sans réinitialiser les succès. |
-| ZIP corrompu / lecture incomplète | Archive marquée incomplète, transfert bloqué. Retéléchargez la même partie, puis relancez `scan`. |
-| Fichier distant manquant | `verify` le signale. `run` le renvoie si son sous-dossier existe et si une source est disponible. |
-| Empreinte distante incorrecte / contenu inattendu | Aucun écrasement automatique. Inspectez et sauvegardez le contenu en conflit. Déplacez le fichier en conflit hors de son sous-dossier, puis reprenez avec le ZIP source disponible. |
-| Sous-dossier technique supprimé | Arrêt sûr. Restaurez le sous-dossier dans la corbeille pCloud avec son identifiant, si possible. Le programme ne réaffecte pas silencieusement les identifiants. |
-| Journal perdu | Restaurez sa sauvegarde. Sans journal, le lien avec un dossier principal renommé est perdu. Ne démarrez pas aveuglément une nouvelle migration dans un autre dossier. |
-
-Les objets restent marqués `verified` jusqu'à une vérification explicite ; `run` ne réaudite pas tous les fichiers déjà transférés. Lancez donc `verify` à la fin et après toute manipulation distante suspecte. La colonne `checked` conserve la date du dernier succès ; elle n'est pas une preuve de succès du dernier contrôle si le statut est `error`.
-
-## Limites, quotas et durée
-
-- Pas de synchronisation continue, de récupération depuis la corbeille Google, ni d'effacement automatique de Google Photos après migration.
-- Pas de téléchargement automatisé des ZIP depuis Google, pas de support TGZ ni d'archives chiffrées ou multi-volumes. Un ZIP volumineux doit tenir localement ou sur un disque externe avant lecture.
-- La reprise se fait **au fichier**, pas à l'octet. Une longue vidéo interrompue avant réception complète doit repartir du début. Une vidéo déjà réceptionnée et retrouvée ne repart pas du début.
-- Un seul transfert à la fois limite la mémoire, les courses et la pression API. Des dizaines de milliers de petits objets créent aussi beaucoup de dossiers et d'appels pCloud ; leur latence peut dominer la durée totale.
-- Aucun débit ni quota d'appels pCloud fixe n'est supposé. Le service peut limiter le débit ou les appels. Les limites effectives dépendent du compte, du réseau et du service. Les quotas Google Photos API ne s'appliquent pas à cette application Takeout.
-- À **10 Mbit/s d'envoi**, 1 To décimal représente environ **9,3 jours** de transmission seule ; à 100 Mbit/s, environ **22,2 heures**. Doublez pour 2 To. Ajoutez préparation Takeout, téléchargement Google, lecture CRC/SHA locale, latence des appels et essais réseau. La validation US ou `--deep` ajoute une relecture complète depuis pCloud, dépendante du débit descendant et des éventuelles limites du service.
-- Aucun logiciel ne peut garantir contre une panne de stockage, un compte supprimé ou une suppression manuelle après vérification. La migration utilise TLS, SQLite durable, contrôle CRC et SHA-256 pour détecter les erreurs ; gardez plusieurs copies jusqu'à validation finale.
-- Réservez les sous-dossiers techniques à cette application pendant les transferts. Le dossier principal peut être renommé librement. Le protocole ne dispose pas d'un verrou distribué ni d'une écriture conditionnelle empêchant un autre client d'intervenir exactement pendant un envoi.
-- Le stockage pCloud Crypto n'est pas pris en charge : la destination est un dossier pCloud standard accessible par l'API.
-
-## Fichiers et tests
-
-```text
-config.example.json       Exemple de configuration séparée des secrets
-requirements.txt          Deux dépendances HTTP
-photos_pcloud/
-  __main__.py             CLI et codes de sortie
-  auth.py                 OAuth pCloud avec callback local
-  pcloud.py               Appels API, flux multipart et contrôles distants
-  takeout.py              Inventaire ZIP, empreintes et dates JSON
-  state.py                SQLite, verrou et rapports
-  migrate.py              Reprise et machine d'état des transferts
-  web.py                  Compagnon HTTP local, tâches et sélection des ZIP
-docs/                     Interface statique publiée sur GitHub Pages
-Lancer-interface.cmd      Lancement Windows avec préparation automatique
-Lancer-interface-locale.cmd  Variante entièrement locale
-tests/test_migration.py   Tests de fiabilité hors connexion
-tests/test_web.py         Contrôles HTTP, sécurité locale et analyse réelle en sous-processus
-tests/web-model.test.mjs  États et compteurs de l'interface
-```
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-node --test tests/web-model.test.mjs
-```
-
-Tests : réponse perdue après réception, interruption après commit distant et redémarrage, panne avant réception, collision de noms, copies d'albums, corruption distante, CRC invalide, source modifiée, dates ambiguës, ajout de parties, déplacement de ZIP, renommage du dossier principal, verrou, refus d'authentification, contrôle du compte, corps multipart réel en flux et vérification EU/US.
-
-L'interface ajoute des tests HTTP réels sur loopback : clé de session, contrôle d'origine et d'hôte, absence d'exposition des secrets, configuration, analyse réelle de ZIP en sous-processus et téléchargement des rapports. Les tests JavaScript vérifient les états vides, prérequis, erreurs et compteurs. Le workflow GitHub Actions exécute ces tests avant de publier `docs/` sur Pages.
-
-**Limite de validation :** les tests automatisés utilisent un simulateur pCloud et des réponses HTTP simulées. Aucun compte réel n'a été connecté ici. Le flux OAuth et un transfert pCloud réel doivent être validés avec vos accès sur un petit export avant de lancer la photothèque complète.
+L'ancien outil Python reste disponible séparément dans [son guide CLI](README-python.md). Il n'est pas nécessaire pour le site.
