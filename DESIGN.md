@@ -16,4 +16,6 @@ Contrôle visuel : captures navigateur aux largeurs 1440, 768, 390 et 375 px, pl
 
 Extension de nettoyage : le panneau de commandes reprend le papier gris, les boutons sobres et la même hiérarchie de texte. L’adresse du compte et la date du contrôle précèdent les commandes. Examiner, tester un média, puis continuer par lots constituent une progression réelle ; le vidage définitif est isolé dans une section repliée, avec saisie d’une phrase et confirmation distincte. Les tests visuels utilisent un simulateur explicitement marqué comme tel, jamais les photos d’un compte utilisateur.
 
+Le vidage automatique optionnel reste dans la section de suppression définitive. La case est décochée par défaut, précise sa portée à la vue en cours et utilise la même phrase de confirmation que le vidage manuel. La confirmation de lancement annonce l’enchaînement irréversible ; aucun accord n’est réutilisé après un arrêt ou un rechargement.
+
 Rangement pCloud : les photos et vidéos apparaissent directement dans le dossier choisi ; les JSON sont regroupés dans « Métadonnées Takeout ». L’étape de destination explique ce résultat avant le lancement et propose « Regrouper les fichiers déjà reçus » pour les journaux de l’ancien rangement. Le regroupement reste dans le même parcours, avec le verrou, la pause, les erreurs et les bilans existants.

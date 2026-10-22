@@ -137,7 +137,7 @@ La section **Après le transfert : nettoyer Google Photos** propose un guide de 
 
 Le contrôle expire après 24 heures. Une nouvelle analyse, un transfert, un nouveau contrôle ou une restauration du journal invalide l’autorisation précédente. Les confirmations doivent être refaites après rechargement de la page. Ce dispositif vérifie **les ZIP fournis**, pas la couverture de toute la photothèque Google : le nombre de parties reste une déclaration utilisateur.
 
-Ne videz pas immédiatement la corbeille. Une suppression peut se répercuter sur les appareils avec sauvegarde activée ; la suppression définitive est irréversible. Consultez les règles actuelles et la procédure dans [l’aide Google Photos](https://support.google.com/photos/answer/6128858?hl=fr&co=GENIE.Platform%3DDesktop).
+Vérifiez vos copies avant de vider la corbeille. Une suppression peut se répercuter sur les appareils avec sauvegarde activée ; la suppression définitive est irréversible. Consultez les règles actuelles et la procédure dans [l’aide Google Photos](https://support.google.com/photos/answer/6128858?hl=fr&co=GENIE.Platform%3DDesktop).
 
 ## Extension de nettoyage Chrome/Edge
 
@@ -150,6 +150,8 @@ Ne videz pas immédiatement la corbeille. Une suppression peut se répercuter su
 3. Activez **Mode développeur**.
 4. Cliquez sur **Charger l’extension non empaquetée** et sélectionnez le dossier `passage-photos-extension` contenant `manifest.json`.
 5. Épinglez **Passage Photos — nettoyage Google Photos** dans le menu des extensions du navigateur.
+
+Pour passer à la version **1.1.0**, téléchargez à nouveau le ZIP depuis le site, remplacez les fichiers du dossier de l’extension déjà chargée, puis cliquez sur **Recharger** (flèche circulaire) sur sa fiche dans `chrome://extensions` ou `edge://extensions`. Actualisez ensuite l’onglet Google Photos pour retirer les anciennes commandes. Une extension chargée manuellement ne se met pas à jour toute seule.
 
 Aucun serveur ni logiciel compagnon n’est requis. L’extension ne demande que `activeTab`, `scripting` et `storage`. L’accès à la page est accordé quand vous cliquez sur son icône ; elle ne s’installe pas toute seule depuis GitHub Pages, ne lit pas vos cookies et ne reçoit aucun jeton pCloud. Aucun script distant ni appel à une API privée Google n’est utilisé. [Permission activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab).
 
@@ -169,7 +171,19 @@ Le panneau permet de télécharger le journal des commandes. Le dernier traiteme
 
 ### Vider définitivement la corbeille
 
-Cette action est distincte et **ne démarre jamais après les lots toute seule**. Elle supprime aussi les éléments déjà présents avant la migration, qui peuvent ne pas être sauvegardés dans votre export.
+Par défaut, cette action reste manuelle. La version 1.1.0 permet aussi d’autoriser son enchaînement à la fin des lots. Dans les deux cas, elle supprime aussi les éléments déjà présents avant la migration, qui peuvent ne pas être sauvegardés dans votre export.
+
+**Pour enchaîner automatiquement après le dernier traitement :**
+
+1. Après le test sur un média, vérifiez que vous avez traité Photos et prévu le traitement d’Archive. L’option concerne uniquement la vue en cours : elle ne traite pas Archive ni le dossier verrouillé à votre place. Activez-la pour votre **dernier traitement**.
+2. Examinez la vue. Dépliez **Vider définitivement la corbeille**, puis cochez **Vider automatiquement la corbeille après cette vue**.
+3. Cochez la confirmation concernant les anciens éléments et vos copies, puis saisissez `VIDER LA CORBEILLE`.
+4. Cliquez sur **Continuer par lots de 25**. La confirmation de lancement nomme le compte et précise le vidage définitif de toute la corbeille. Une fois autorisé, aucun deuxième accord n’est demandé en fin de traitement.
+5. L’extension attend que Google indique la vue vide, confirme cet état une seconde fois sans chargement visible, ouvre la corbeille via son lien Google et exécute le vidage. Le compte, la validité du contrôle et les confirmations Google restent vérifiés à chaque étape.
+
+Un arrêt, une erreur, un compte différent, un contrôle expiré, un lien de corbeille absent ou une confirmation ambiguë empêche le vidage. L’autorisation est effacée à la fin de chaque opération et n’est jamais restaurée après un rechargement. Si la navigation Google recharge complètement la page, l’automatisation s’arrête : rouvrez les commandes pour vérifier le résultat. Gardez l’onglet visible jusqu’à l’indication de corbeille vide.
+
+**Pour vider manuellement :**
 
 1. Vérifiez vos copies et le contenu complet de la corbeille. Ouvrez la vue **Corbeille** de Google Photos, puis examinez-la avec le panneau de l’extension.
 2. Dépliez **Vider définitivement la corbeille**. Cochez la confirmation des anciens éléments et saisissez exactement `VIDER LA CORBEILLE`.

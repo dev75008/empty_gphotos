@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Passage Photos — nettoyage Google Photos",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Nettoyage par lots après contrôle d'un export Passage Photos. Activation explicite sur Google Photos uniquement.",
   "permissions": ["activeTab", "scripting", "storage"],
   "action": {"default_popup": "popup.html", "default_title": "Passage Photos — nettoyage"}

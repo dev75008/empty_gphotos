@@ -64,3 +64,54 @@ test('Isolated extension commands: batches, stop, wrong account and separate per
     assert.deepEqual(errors,[]);
   }finally{await browser.close();}
 });
+
+test('Automatic emptying requires explicit consent and a completed empty view; stops and ambiguous states never empty',{timeout:120000},async t=>{
+  const executablePath=await chromePath();if(!executablePath){t.skip('Chrome absent.');return;}
+  const browser=await chromium.launch({executablePath,headless:true});
+  try{
+    const html=await readFile(new URL('./fixtures/google-photos-ui.html',import.meta.url),'utf8');
+    const script=await readFile(new URL('../extension/automation.js',import.meta.url),'utf8');
+    for(const scenario of ['success','stop','missing-link','expired','account-changed','unexpected-dialog','loading']){
+      const page=await browser.newPage({viewport:{width:1440,height:900}});
+      try{
+        await page.route('**/*',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:route.request().isNavigationRequest()?html:''}));
+        await page.goto('https://photos.google.com/');
+        const cdp=await page.context().newCDPSession(page),{frameTree}=await cdp.send('Page.getFrameTree');
+        const {executionContextId}=await cdp.send('Page.createIsolatedWorld',{frameId:frameTree.frame.id,worldName:'auto-empty-qa'});
+        const isolated=async expression=>{
+          const response=await cdp.send('Runtime.evaluate',{contextId:executionContextId,expression,awaitPromise:true,returnByValue:true});
+          if(response.exceptionDetails)throw new Error(JSON.stringify(response.exceptionDetails));return response.result.value;
+        };
+        await isolated('window.prompts=[];window.confirm=text=>{prompts.push(text);return true;};window.chrome={storage:{local:{set:async value=>window.stored=value,get:async()=>window.stored||{}}}};');
+        await isolated(script);
+        const proof={email:'test@example.com',files:3,expiresAt:Date.now()+120000,completedAt:new Date().toISOString()};
+        await isolated('globalThis.qaProof='+JSON.stringify(proof)+';PassagePhotosCleanup.mount(qaProof)');
+        const click=id=>page.evaluate(id=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById(id).click(),id);
+        const until=fn=>page.waitForFunction(fn,null,{timeout:15000});
+        await click('inspect');await click('one');
+        await until(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('status').textContent.startsWith('Test confirmé'));
+        assert.equal(await page.evaluate(()=>qa.permanent),0);
+        await page.evaluate(()=>qa.reset(1));await click('inspect');
+        await page.evaluate(()=>{const r=document.getElementById('passage-photos-cleanup').shadowRoot;r.getElementById('auto-empty').checked=true;r.getElementById('auto-empty').dispatchEvent(new Event('input'));});
+        assert.equal(await page.evaluate(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('all').disabled),true);
+        await page.evaluate(()=>{const r=document.getElementById('passage-photos-cleanup').shadowRoot;r.getElementById('old-trash').checked=true;r.getElementById('phrase').value='VIDER LA CORBEILLE';r.getElementById('phrase').dispatchEvent(new Event('input'));});
+        assert.equal(await page.evaluate(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('all').disabled),false);
+        if(scenario==='missing-link')await page.evaluate(()=>document.getElementById('trash-link').remove());
+        if(scenario==='loading')await page.evaluate(()=>{const progress=document.createElement('div');progress.setAttribute('role','progressbar');progress.textContent='Chargement';document.body.append(progress);});
+        if(scenario==='expired')await isolated('qaProof.expiresAt=Date.now()+700');
+        if(scenario==='account-changed')await page.evaluate(()=>{const link=document.getElementById('trash-link'),navigate=link.onclick;link.onclick=event=>{navigate(event);document.getElementById('account').setAttribute('aria-label','Compte Google : Other (other@example.com)');};});
+        if(scenario==='unexpected-dialog')await page.evaluate(()=>{document.getElementById('empty-button').onclick=()=>{const dialog=document.createElement('div');dialog.setAttribute('role','dialog');dialog.textContent='Une action inattendue';const button=document.createElement('button');button.textContent='Supprimer définitivement';button.onclick=()=>qa.permanent++;dialog.append(button);document.body.append(dialog);};});
+        await click('all');if(scenario==='stop')await click('stop');
+        await until(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('stop').disabled);
+        assert.equal(await page.evaluate(()=>qa.permanent),scenario==='success'?1:0,scenario);
+        if(scenario==='success'){
+          assert.equal(await page.evaluate(()=>location.pathname),'/trash');
+          assert.match(await page.evaluate(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('status').textContent),/Google indique la corbeille vide/);
+        }
+        assert.equal(await page.evaluate(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('auto-empty').checked),false);
+        assert.equal(await page.evaluate(()=>document.getElementById('passage-photos-cleanup').shadowRoot.getElementById('phrase').value),'');
+        assert.ok((await isolated('prompts')).some(text=>text.includes('AUTOMATIQUEMENT ET DÉFINITIVEMENT TOUTE la corbeille')&&text.includes('test@example.com')));
+      }finally{await page.close();}
+    }
+  }finally{await browser.close();}
+});

@@ -2,9 +2,11 @@
 body{font:16px system-ui;margin:24px;color:#16191d;background:#fff}main{max-width:700px}.media{display:inline-block;margin:8px;padding:12px;border:1px solid #ccc}.thumb{width:110px;height:80px;background:#e6e6e6;margin-bottom:8px}[role=checkbox]{display:block;width:44px;height:44px;background:#ddd;cursor:pointer}[role=checkbox][aria-checked=true]{background:#1d5fbf}[role=dialog]{position:fixed;left:40px;top:250px;background:white;border:2px solid #555;padding:24px;z-index:10}button{padding:12px;margin:4px}
 </style></head><body><h1>Simulateur Google Photos</h1><p>Aucune photo réelle. Aucune requête à Google.</p>
 <button id="account" aria-label="Compte Google : Test (test@example.com)">Compte de test</button>
+<a id="trash-link" href="/trash">Corbeille</a>
 <button id="delete" aria-label="Supprimer" disabled>Supprimer</button><button id="empty-button">Vider la corbeille</button>
 <main></main><script>
-window.qa={moves:0,permanent:0,requested:0,mode:'normal',delay:0};
+window.qa={moves:0,permanent:0,requested:0,mode:'normal',delay:0,trashEmpty:false};
+document.getElementById('trash-link').onclick=event=>{event.preventDefault();history.pushState({},'','/trash');document.querySelector('main').innerHTML=qa.trashEmpty?'<p>La corbeille est vide</p>':'<p>Corbeille contenant les médias supprimés</p>';};
 qa.reset=(size=3)=>{
   document.querySelectorAll('[role=dialog]').forEach(el=>el.remove());
   const main=document.querySelector('main');main.replaceChildren();
@@ -27,11 +29,11 @@ document.getElementById('delete').onclick=()=>{
   if(qa.mode==='permanent'){dialog('Supprimer définitivement les éléments de la corbeille ?','Supprimer définitivement',()=>qa.permanent++);return;}
   dialog('Placer les éléments sélectionnés dans la corbeille ?','Placer dans la corbeille',()=>{
     const picked=[...document.querySelectorAll('main [aria-checked=true]')].map(el=>el.closest('[data-id]'));
-    setTimeout(()=>{qa.moves+=picked.length;picked.forEach(el=>el.remove());document.getElementById('delete').disabled=true;
+    setTimeout(()=>{qa.moves+=picked.length;qa.trashEmpty=false;picked.forEach(el=>el.remove());document.getElementById('delete').disabled=true;
       if(!document.querySelector('main [data-id]'))document.querySelector('main').innerHTML='<p>Aucune photo ni vidéo</p>';
     },qa.delay);
   });
 };
-document.getElementById('empty-button').onclick=()=>dialog('Supprimer définitivement tous les éléments de la corbeille ?','Supprimer définitivement',()=>{qa.permanent++;document.querySelector('main').innerHTML='<p>La corbeille est vide</p>';});
+document.getElementById('empty-button').onclick=()=>dialog('Supprimer définitivement tous les éléments de la corbeille ?','Supprimer définitivement',()=>{qa.permanent++;qa.trashEmpty=true;document.querySelector('main').innerHTML='<p>La corbeille est vide</p>';});
 qa.reset();
 </script></body></html>

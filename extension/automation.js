@@ -67,10 +67,10 @@
         :host{font:14px/1.5 system-ui,sans-serif;color:#16191d}*{box-sizing:border-box}section{background:#f2f4f7;border:1px solid #aeb5bd;border-radius:6px;padding:18px;max-height:calc(100vh - 32px);overflow:auto}header{display:flex;align-items:center;justify-content:space-between;gap:12px}h2{font-size:17px;margin:0}p{margin:10px 0}button,input{font:inherit}button{min-height:44px;background:#fff;border:1px solid #aeb5bd;border-radius:4px;color:inherit;padding:9px 12px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:grid;gap:8px;margin:12px 0}small{color:#60646b;display:block}input[type=text]{width:100%;padding:10px;border:1px solid #aeb5bd;border-radius:4px;margin:8px 0}label{display:flex;gap:8px}input[type=checkbox]{width:18px;height:18px;flex:none}button:focus-visible,input:focus-visible{outline:2px solid #1d5fbf;outline-offset:2px}#stop{color:#9b2424}#status{white-space:pre-wrap;overflow-wrap:anywhere}details{margin-top:14px}summary{cursor:pointer;min-height:32px}#email{overflow-wrap:anywhere}
         </style><section aria-label="Commandes Passage Photos"><header><h2>Passage Photos</h2><button id="close" aria-label="Fermer les commandes">Fermer</button></header>
         <p id="email"></p><small id="audit"></small>
-        <p>Corbeille par lots, puis vidage définitif séparé. Le contrôle porte sur vos ZIP, pas sur tout le compte Google.</p>
+        <p>Corbeille par lots. Le vidage définitif peut s’enchaîner si vous l’autorisez avant le lancement. Le contrôle porte sur vos ZIP, pas sur tout le compte Google.</p>
         <div class="actions"><button id="inspect">Examiner cette vue sans supprimer</button><button id="one" disabled>Tester sur 1 média</button><button id="all" disabled>Continuer par lots de 25</button><button id="stop" disabled>Arrêter</button></div>
         <p id="status" role="status">Examinez d’abord la vue ouverte.</p><small id="counts">0 média confirmé dans cette session.</small>
-        <details id="permanent"><summary>Vider définitivement la corbeille</summary><p>Cette action détruit aussi les éléments déjà présents avant cette migration. Elle est irréversible.</p><label><input id="old-trash" type="checkbox">J’ai vérifié toute la corbeille, y compris les anciens éléments, et mes copies sauvegardées.</label><input id="phrase" type="text" autocomplete="off" aria-label="Saisir VIDER LA CORBEILLE" placeholder="Saisir VIDER LA CORBEILLE"><button id="empty" disabled>Vider définitivement la corbeille</button></details>
+        <details id="permanent"><summary>Vider définitivement la corbeille</summary><p>Cette action détruit aussi les éléments déjà présents avant cette migration. Elle est irréversible.</p><label><input id="auto-empty" type="checkbox">Vider automatiquement la corbeille après cette vue</label><small>À activer pour votre dernier traitement, après vérification de Photos et Archive. Le vidage s’enchaîne seulement si Google indique la vue vide, jamais après une erreur ou un arrêt.</small><label><input id="old-trash" type="checkbox">J’ai vérifié toute la corbeille, y compris les anciens éléments, et mes copies sauvegardées.</label><input id="phrase" type="text" autocomplete="off" aria-label="Saisir VIDER LA CORBEILLE" placeholder="Saisir VIDER LA CORBEILLE"><button id="empty" disabled>Vider définitivement la corbeille</button></details>
         <div class="actions"><button id="journal">Télécharger le journal des commandes</button></div><small>Gardez cet onglet visible. Un clic, une touche ou un défilement manuel hors de ce panneau arrête l’automatisation. Après rechargement, importez à nouveau le contrôle ; aucun redémarrage automatique.</small></section>`;
       document.documentElement.append(host);
       const $=id=>shadow.getElementById(id);
@@ -78,27 +78,31 @@
       let controller=null,currentRoute=null,inspected=false,tested=false,count=0,records=[];
       const session=crypto.randomUUID();
       function status(message){$('status').textContent=message;}
+      const permanentConsent=()=>$('old-trash').checked&&$('phrase').value==='VIDER LA CORBEILLE';
+      function clearConsent(){$('auto-empty').checked=false;$('phrase').value='';$('old-trash').checked=false;}
       function render(){
         const busy=Boolean(controller),valid=Date.now()<proof.expiresAt;
         $('inspect').disabled=busy;$('one').disabled=busy||!valid||!inspected||currentRoute==='trash';
-        $('all').disabled=busy||!valid||!inspected||!tested||currentRoute==='trash';
+        $('all').disabled=busy||!valid||!inspected||!tested||currentRoute==='trash'||$('auto-empty').checked&&!permanentConsent();
         $('stop').disabled=!busy;$('close').disabled=busy;
-        $('empty').disabled=busy||!valid||!inspected||currentRoute!=='trash'||!$('old-trash').checked||$('phrase').value!=='VIDER LA CORBEILLE';
+        $('empty').disabled=busy||!valid||!inspected||currentRoute!=='trash'||!permanentConsent();
+        for(const id of ['auto-empty','old-trash','phrase'])$(id).disabled=busy||!valid;
         $('counts').textContent=`${count} média(s) confirmé(s) dans cette session. Ce compteur ne prouve pas que le compte entier est vide.`;
       }
-      function guard(scope){
+      function guard(scope,alternate){
         controller?.signal.throwIfAborted();
         if(Date.now()>=proof.expiresAt)throw new Error('Le contrôle a expiré. Arrêt ; relancez le contrôle intégral sur pCloud.');
         if(document.visibilityState!=='visible')throw new Error('Onglet masqué. Arrêt ; revenez sur Google Photos.');
         if(account()!==proof.email)throw new Error('Le compte Google a changé. Arrêt.');
-        if(route()!==scope)throw new Error('La vue Google Photos a changé. Arrêt ; examinez la nouvelle vue.');
+        const actual=route();
+        if(actual!==scope&&actual!==alternate)throw new Error('La vue Google Photos a changé. Arrêt ; examinez la nouvelle vue.');
       }
       async function record(event,extra={}){
         const row={time:new Date().toISOString(),event,scope:currentRoute,...extra};records.push(row);
         // If persistence fails, no further destructive click is attempted.
         await chrome.storage.local.set({lastCleanup:{session,email:proof.email,audit:proof.completedAt,confirmed:count,records:records.slice(-200)}});
       }
-      async function sleep(ms){
+      async function sleep(ms,alternate){
         await new Promise((resolve,reject)=>{
           const signal=controller?.signal;
           const cancel=()=>{clearTimeout(timer);reject(signal.reason);};
@@ -106,7 +110,7 @@
           signal?.addEventListener('abort',cancel,{once:true});
           if(signal?.aborted)cancel();
         });
-        guard(currentRoute);
+        guard(currentRoute,alternate);
       }
       async function until(predicate,message,timeout=20000){
         const end=Date.now()+timeout;
@@ -115,6 +119,39 @@
       }
       function click(el){guard(currentRoute);if(!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')throw new Error('Commande Google devenue indisponible.');el.click();}
       function noDialogs(){if(dialogs().length)throw new Error('Fermez la boîte de dialogue Google avant de continuer.');}
+      async function navigateToTrash(){
+        guard(currentRoute);noDialogs();
+        const prefix=location.pathname.match(/^\/u\/\d+(?=\/|$)/)?.[0]||'';
+        const links=[...document.querySelectorAll('a[href]')].filter(link=>{
+          if(!visible(link))return false;
+          const url=new URL(link.href,location.href),path=url.pathname.replace(/\/+$/,'');
+          return url.origin===location.origin&&!url.search&&!url.hash&&(path===prefix+'/trash'||!prefix&&path==='/u/0/trash');
+        });
+        if(links.length!==1)throw new Error('Lien vers la corbeille absent ou ambigu. Vidage automatique annulé ; ouvrez la corbeille manuellement.');
+        await record('navigation_corbeille');click(links[0]);
+        const end=Date.now()+20000;
+        while(route()!=='trash'){
+          guard(currentRoute,'trash');
+          if(Date.now()>=end)throw new Error('Ouverture de la corbeille non confirmée. Aucun vidage tenté.');
+          await sleep(250,'trash');
+        }
+        currentRoute='trash';guard('trash');
+        await until(()=>emptyMarker(labels.trashEmpty)||buttons(document).some(el=>named(el,labels.empty)),'La corbeille Google n’est pas prête.');
+      }
+      async function emptyTrash(){
+        guard('trash');noDialogs();
+        if(selected().length)throw new Error('Une sélection existe dans la corbeille. Arrêt sans vidage.');
+        if(emptyMarker(labels.trashEmpty)){await record('corbeille_déjà_vide');status('Google indique la corbeille déjà vide.');return;}
+        await record('vidage_demandé');click(uniqueButton(document,labels.empty));
+        await until(()=>dialogs().length===1,'Confirmation de vidage non reconnue.');
+        const dialog=dialogs()[0],text=normalize(dialog.textContent);
+        if(!/permanen|définitiv/.test(text)||!/trash|corbeille|\bbin\b/.test(text))throw new Error('Confirmation définitive non reconnue. Aucun clic de confirmation.');
+        const matches=buttons(dialog).filter(el=>named(el,labels.permanent)||named(el,labels.empty));
+        if(matches.length!==1)throw new Error('Bouton de confirmation définitive absent ou ambigu.');
+        await record('vidage_confirmation');click(matches[0]);
+        await until(()=>dialogs().length===0&&emptyMarker(labels.trashEmpty),'Vidage non confirmé par Google.',30000);
+        await record('corbeille_vide');status('Google indique la corbeille vide. Les suppressions définitives ne peuvent pas être annulées.');
+      }
       async function batch(limit){
         guard(currentRoute);noDialogs();
         if(selected().length)throw new Error('Une sélection existe déjà. Annulez-la manuellement avant de reprendre.');
@@ -144,7 +181,7 @@
         if(controller)return;controller=new AbortController();render();
         try{guard(currentRoute);await operation();}
         catch(error){status(error.name==='AbortError'?'Arrêt demandé. Une opération déjà envoyée à Google peut encore aboutir. Vérifiez la sélection et la corbeille avant de reprendre.':error.message);await record('arrêt',{message:error.message}).catch(()=>{});}
-        finally{controller=null;inspected=false;render();}
+        finally{controller=null;inspected=false;clearConsent();render();}
       }
       $('inspect').onclick=()=>{
         try{
@@ -159,12 +196,26 @@
         run(async()=>{if(!await batch(1))throw new Error('Aucun média sélectionnable à l’écran. Faites défiler puis examinez à nouveau.');status('Test confirmé. Vérifiez le média dans la corbeille, revenez à cette vue et examinez-la avant de continuer par lots.');});
       };
       $('all').onclick=()=>{
-        if(!inspected||!tested||!confirm(`Placer TOUS les médias accessibles de cette vue (${currentRoute}) du compte ${proof.email} dans la corbeille, par lots de 25 ? Les ajouts absents de l’export seraient également concernés.`))return;
+        const autoEmpty=$('auto-empty').checked;
+        if($('all').disabled||!inspected||!tested||autoEmpty&&!permanentConsent())return;
+        const finalAction=autoEmpty?' Puis vider AUTOMATIQUEMENT ET DÉFINITIVEMENT TOUTE la corbeille, y compris les anciens éléments. Cette action est irréversible.':'';
+        if(!confirm(`Placer TOUS les médias accessibles de cette vue (${currentRoute}) du compte ${proof.email} dans la corbeille, par lots de 25 ? Les ajouts absents de l’export seraient également concernés.${finalAction}`))return;
         run(async()=>{
+          await record('lots_autorisés',{autoEmpty});
           let idle=0;
           for(let rounds=0;rounds<20000;rounds++){
             if(await batch(25)){idle=0;continue;}
-            if(emptyMarker(labels.photosEmpty)){await record('vue_vide');status('Google indique cette vue vide. Vérifiez ensuite Photos ET Archive. Le dossier verrouillé et les éléments seulement partagés nécessitent une vérification manuelle. La corbeille reste conservée.');return;}
+            if(emptyMarker(labels.photosEmpty)){
+              await record('vue_vide');
+              if(autoEmpty){
+                await sleep(1500);
+                if(entries().size||selected().length||!emptyMarker(labels.photosEmpty)||[...document.querySelectorAll('[role="progressbar"],[aria-busy="true"]')].some(visible))throw new Error('La vue vide n’est pas confirmée ou Google charge encore des éléments. Aucun vidage automatique.');
+                await record('vidage_auto_autorisé');
+                status('Vue vide confirmée. Ouverture de la corbeille pour le vidage autorisé.');await navigateToTrash();await emptyTrash();
+              }
+              else status('Google indique cette vue vide. Vérifiez ensuite Photos ET Archive. Le dossier verrouillé et les éléments seulement partagés nécessitent une vérification manuelle. La corbeille reste conservée.');
+              return;
+            }
             if(++idle>3)throw new Error('La grille ne progresse pas. Arrêt ; vérifiez le chargement avant de reprendre.');
             // A virtualized grid may not have loaded its next items yet.
             const root=main(),scroll=[root,...root.querySelectorAll('*')].find(el=>el.scrollHeight>el.clientHeight+100&&/auto|scroll/.test(getComputedStyle(el).overflowY));
@@ -178,21 +229,9 @@
       $('empty').onclick=()=>{
         if($('empty').disabled||$('phrase').value!=='VIDER LA CORBEILLE'||!$('old-trash').checked)return;
         if(!confirm(`Supprimer DÉFINITIVEMENT TOUTE la corbeille du compte ${proof.email}, y compris les anciens éléments ? Cette action est irréversible.`))return;
-        $('phrase').value='';$('old-trash').checked=false;
-        run(async()=>{
-          guard('trash');noDialogs();await record('vidage_demandé');
-          click(uniqueButton(document,labels.empty));
-          await until(()=>dialogs().length===1,'Confirmation de vidage non reconnue.');
-          const dialog=dialogs()[0],text=normalize(dialog.textContent);
-          if(!/permanen|définitiv/.test(text)||!/trash|corbeille|\bbin\b/.test(text))throw new Error('Confirmation définitive non reconnue. Aucun clic de confirmation.');
-          const matches=buttons(dialog).filter(el=>named(el,labels.permanent)||named(el,labels.empty));
-          if(matches.length!==1)throw new Error('Bouton de confirmation définitive absent ou ambigu.');
-          await record('vidage_confirmation');click(matches[0]);
-          await until(()=>dialogs().length===0&&emptyMarker(labels.trashEmpty),'Vidage non confirmé par Google.',30000);
-          await record('corbeille_vide');status('Google indique la corbeille vide. Les suppressions définitives ne peuvent pas être annulées.');
-        });
+        clearConsent();run(emptyTrash);
       };
-      for(const id of ['phrase','old-trash'])$(id).addEventListener('input',render);
+      for(const id of ['phrase','old-trash','auto-empty'])$(id).addEventListener('input',render);
       const stop=()=>controller?.abort(new DOMException('Arrêt utilisateur','AbortError'));
       $('stop').onclick=stop;
       const interrupt=event=>{if(event.isTrusted&&!event.composedPath().includes(host))stop();};
