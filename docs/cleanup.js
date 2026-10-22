@@ -13,6 +13,7 @@ export function inventoryFingerprint(objects,archives,binding){
 export function cleanupState({objects,archives,binding,audit,identity,auth,busy},now=Date.now()){
   const fail=reason=>({ready:false,reason,archiveCount:archives.size});
   if(busy)return fail('Attendez la fin de l’opération en cours.');
+  if([...objects.values()].some(object=>object.publication))return fail('Terminez le regroupement des fichiers sur pCloud avant le contrôle final.');
   if(!objects.size||!archives.size)return fail('Analysez et transférez vos archives Takeout.');
   if([...archives.values()].some(archive=>!archive.complete))return fail('Terminez l’analyse de toutes les archives.');
   if([...objects.values()].some(object=>object.status!=='verified'))return fail('Tous les fichiers doivent être vérifiés, sans erreur ni fichier restant.');

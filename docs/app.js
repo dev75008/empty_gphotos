@@ -1,8 +1,8 @@
-import {emptyStatus,progressOf,bytes,jobLabel,readiness} from './model.js';
-import {openJournal} from './browser-state.js?v=3';
-import {BrowserMigration} from './browser-engine.js?v=3';
+import {emptyStatus,progressOf,bytes,jobLabel,readiness} from './model.js?v=5';
+import {openJournal} from './browser-state.js?v=5';
+import {BrowserMigration} from './browser-engine.js?v=5';
 import {beginAuth,consumeCallback,redirectURI} from './browser-auth.js';
-import {cleanupChecklist} from './cleanup.js';
+import {cleanupChecklist} from './cleanup.js?v=5';
 
 const $=id=>document.getElementById(id);
 const format=value=>new Intl.NumberFormat('fr-FR').format(value);
@@ -57,20 +57,22 @@ function render(){
   $('folder').disabled=!ready.edit||Boolean(db.binding)||pending;
   if(db.binding||(!folderDirty&&document.activeElement!==$('folder')))$('folder').value=db.binding?.initial_name||settings.folder;
   $('folder-help').textContent=db.binding?'Destination liée au journal. Vous pouvez renommer ce dossier directement dans pCloud.':'Vous pourrez le renommer dans pCloud après sa création.';
+  $('organize-button').disabled=!ready.organize||pending;
+  $('organize-hint').textContent=db.to_organize?`${plural(db.to_organize,'fichier')} à examiner pour le regroupement. Les fichiers reçus seront rangés directement sur pCloud, sans nouvel envoi depuis vos ZIP.`:'Le nouveau rangement s’applique au transfert. Ce bouton regroupe les fichiers reçus avec l’ancienne version, sans les renvoyer.';
   $('selection-label').textContent=settings.paths.length===1?settings.paths[0]:settings.paths.length?`${plural(settings.paths.length,'archive')} sélectionnées`:'Aucune archive sélectionnée';
   $('selection-detail').textContent=settings.paths.length?'Les ZIP restent sur votre ordinateur.':'Vous pouvez ajouter les parties une par une.';
   $('archive-state').textContent=!db.archives.length?'À préparer':db.archives.some(a=>!a.complete)?'Analyse incomplète':`${plural(db.archives.length,'partie')} ${db.archives.length===1?'analysée':'analysées'}`;
   $('archive-state').classList.toggle('done',db.archives.length>0&&db.archives.every(a=>a.complete));
   $('run-button').disabled=!ready.run||pending;
-  $('run-button').textContent=db.total&&db.remaining===0?'Tous les fichiers sont vérifiés':db.verified||job.paused||db.errors?'Reprendre le transfert':'Lancer le transfert';
-  $('run-hint').textContent=!supported?'Le stockage du navigateur est requis.':busy?'Une opération est en cours.':!pcloud.connected?'Connectez votre compte pCloud.':!db.total?'Analysez vos archives pour continuer.':db.archives.some(a=>!a.complete)?'Terminez l’analyse des archives.':!db.remaining?'Lancez le contrôle final.':'Les fichiers déjà vérifiés sont conservés.';
+  $('run-button').textContent=db.total&&db.remaining===0?(db.to_organize?'Regrouper les fichiers sur pCloud':'Tous les fichiers sont vérifiés'):db.verified||job.paused||db.errors?'Reprendre le transfert':'Lancer le transfert';
+  $('run-hint').textContent=!supported?'Le stockage du navigateur est requis.':busy?'Une opération est en cours.':!pcloud.connected?'Connectez votre compte pCloud.':!db.total?'Analysez vos archives pour continuer.':db.archives.some(a=>!a.complete)?'Terminez l’analyse des archives.':db.to_organize?'Les fichiers déjà reçus seront regroupés sans renvoi.':!db.remaining?'Lancez le contrôle final.':'Les fichiers déjà vérifiés sont conservés.';
   $('job-state').textContent=jobLabel(job);
   const percent=progressOf(db);$('progress').value=percent;$('percent').textContent=`${percent} %`;
   $('progress-caption').textContent=db.total?`${plural(db.total,'fichier')} ${db.total===1?'unique':'uniques'}`:'Aucun fichier analysé';
   for(const field of ['verified','remaining','errors'])$('count-'+field).textContent=format(db[field]);
   $('count-errors').classList.toggle('has-errors',db.errors>0);
   $('volume').textContent=db.bytes?`${bytes(db.verified_bytes)} / ${bytes(db.bytes)}`:'0 octet';
-  $('activity').textContent=job.running?{auth:'Vérification de la connexion pCloud.',scan:'Lecture des ZIP et contrôle des empreintes.',run:'Envoi et vérification des fichiers sur pCloud.',verify:'Contrôle des fichiers reçus sur pCloud.',restore:'Restauration du journal.'}[job.command]||'Opération en cours.':job.paused?'Opération en pause. Le journal est conservé.':job.exit_code?'L’opération s’est arrêtée. Consultez le journal puis reprenez.':job.command==='verify'&&job.exit_code===0?'Contrôle terminé. Comparez aussi les parties traitées avec votre export Google.':db.total&&!db.remaining?'Tous les fichiers inventoriés sont vérifiés. Pensez au contrôle final.':db.total?(pcloud.connected?'Votre inventaire est prêt. Lancez ou reprenez le transfert.':'Votre inventaire est prêt. Connectez pCloud pour continuer.'):'Connectez pCloud et choisissez vos archives pour commencer.';
+  $('activity').textContent=job.running?{auth:'Vérification de la connexion pCloud.',scan:'Lecture des ZIP et contrôle des empreintes.',run:'Envoi et vérification des fichiers sur pCloud.',organize:'Regroupement sur pCloud et contrôle des copies, sans renvoi des ZIP.',verify:'Contrôle des fichiers reçus sur pCloud.',restore:'Restauration du journal.'}[job.command]||'Opération en cours.':job.paused?'Opération en pause. Le journal est conservé.':job.exit_code?'L’opération s’est arrêtée. Consultez le journal puis reprenez.':job.command==='verify'&&job.exit_code===0?'Contrôle terminé. Comparez aussi les parties traitées avec votre export Google.':db.total&&!db.remaining?'Tous les fichiers inventoriés sont vérifiés. Pensez au contrôle final.':db.total?(pcloud.connected?'Votre inventaire est prêt. Lancez ou reprenez le transfert.':'Votre inventaire est prêt. Connectez pCloud pour continuer.'):'Connectez pCloud et choisissez vos archives pour commencer.';
   $('live-detail').textContent=job.running?detail:'';$('live-detail').hidden=!job.running||!detail;
   $('pause-button').hidden=!job.running;$('pause-button').disabled=job.paused;
   $('pause-button').textContent=job.command==='scan'?'Interrompre l’analyse':'Mettre en pause';
@@ -122,6 +124,7 @@ $('run-button').addEventListener('click',()=>start('run',async signal=>{
 }));
 $('pause-button').addEventListener('click',()=>engine.pause());
 $('verify-button').addEventListener('click',()=>start('verify',signal=>engine.verify(signal,$('deep').checked)));
+$('organize-button').addEventListener('click',()=>start('organize',signal=>engine.organize(signal)));
 $('cleanup-audit-button').addEventListener('click',()=>start('verify',signal=>engine.verify(signal,true)));
 $('cleanup-report-button').addEventListener('click',()=>act(async()=>{
   const technical=engine.snapshot().cleanup;

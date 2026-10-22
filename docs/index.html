@@ -9,7 +9,7 @@
   <title>Passage Photos · Google Photos vers pCloud</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css?v=3">
-  <script type="module" src="./app.js?v=4"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
   <a href="#main" class="skip">Aller au transfert</a>
@@ -64,7 +64,7 @@
 
         <section class="step last-step" aria-labelledby="destination-title">
           <div class="step-header"><span class="step-number">3</span><div><h2 id="destination-title">Choisir la destination</h2><p>Le dossier est créé dans votre espace pCloud.</p></div></div>
-          <div class="step-body"><label for="folder">Nom du dossier pCloud</label><input id="folder" value="Ma phototheque" maxlength="240" disabled><p id="folder-help" class="small">Vous pourrez le renommer dans pCloud après sa création.</p></div>
+          <div class="step-body"><label for="folder">Nom du dossier pCloud</label><input id="folder" value="Ma phototheque" maxlength="240" disabled><p id="folder-help" class="small">Vous pourrez le renommer dans pCloud après sa création.</p><p class="small">Photos et vidéos directement dans ce dossier. Les JSON sont conservés à part dans « Métadonnées Takeout ».</p><button id="organize-button" class="button secondary" disabled>Regrouper les fichiers déjà reçus</button><p id="organize-hint" class="small" role="status">Le nouveau rangement s’applique au transfert. Ce bouton regroupe les fichiers reçus avec l’ancienne version, sans les renvoyer.</p></div>
         </section>
 
         <div class="transfer-actions"><button id="run-button" class="button primary" disabled>Lancer le transfert</button><span id="run-hint" class="small">Connectez pCloud et analysez vos archives.</span></div>
@@ -115,6 +115,7 @@
     <details><summary>Pourquoi un export Google Takeout ?</summary><p>Depuis mars 2025, l'API Google Photos ne permet plus de lire automatiquement votre photothèque existante. Takeout permet de récupérer les fichiers exportés et leurs métadonnées.</p></details>
     <details><summary>Où sont mes fichiers et mes accès ?</summary><p>Les ZIP sont lus ici et les médias sont envoyés directement à pCloud. Le journal est enregistré dans IndexedDB ; le jeton d'accès reste dans la session de l'onglet et n'est jamais inclus dans le journal exporté. Un seul média est préparé à la fois dans l'espace temporaire privé du navigateur, puis effacé de cet espace.</p></details>
     <details><summary>Comment reprendre après fermeture ?</summary><p>Revenez sur cette page avec le même navigateur et le même profil, reconnectez pCloud si nécessaire et sélectionnez à nouveau les ZIP utiles. Cliquez sur Reprendre le transfert. Ne supprimez pas les données du site. Sauvegardez régulièrement le journal et conservez vos ZIP : un navigateur peut effacer son stockage local.</p></details>
+    <details><summary>Voir directement les photos dans pCloud</summary><p>Les photos et vidéos sont placées directement dans le dossier choisi ; les JSON sont conservés à part dans « Métadonnées Takeout ». Si vous aviez commencé avec l’ancien rangement, mettez en pause, sauvegardez le journal, rechargez cette page puis cliquez sur « Regrouper les fichiers déjà reçus ». Aucun nouvel envoi depuis vos ZIP n’est nécessaire pour les copies reçues. Le regroupement vérifie chaque copie finale avant de retirer l’ancienne copie technique et peut reprendre après interruption. Prévoyez sur pCloud la place d’un fichier supplémentaire pendant cette étape.</p></details>
     <details><summary>Les gros fichiers et le disque</summary><p>Il faut assez de place pour les ZIP et pour préparer le plus gros fichier individuel. Aucun ZIP complet n'est décompressé. Sans espace privé sur disque pris en charge par le navigateur, la préparation en mémoire est limitée à 128 Mo par fichier. Certaines relectures distantes peuvent être bloquées par les règles réseau de pCloud ; un fichier non contrôlé n'est pas déclaré vérifié.</p></details>
     <a class="button secondary" href="https://github.com/dev75008/empty_gphotos#readme" target="_blank" rel="noopener noreferrer">Lire le guide détaillé</a>
   </dialog>

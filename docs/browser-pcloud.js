@@ -2,6 +2,9 @@ import {sha256,bytesToHex} from './vendor/archive.js';
 import {HOSTS} from './browser-auth.js';
 export class Retryable extends Error{constructor(message,delay=0){super(message);this.delay=delay;}}
 export class AuthError extends Error{}
+export class MissingError extends Error{}
+export class ConflictError extends Error{}
+export class NotEmptyError extends Error{}
 export function abort(signal){signal?.throwIfAborted();}
 export function wait(ms,signal){return new Promise((resolve,reject)=>{
   abort(signal);
@@ -35,6 +38,9 @@ export class BrowserPCloud{
     let data;try{data=await response.json();}catch{throw new Retryable('Réponse pCloud incomplète.');}
     if([1000,2000,2094].includes(data.result))throw new AuthError('Jeton pCloud refusé. Reconnectez votre compte pour reprendre.');
     if([2041,4000,5000,5001].includes(data.result))throw new Retryable(`Erreur pCloud temporaire (${data.result}).`);
+    if([2005,2009].includes(data.result))throw new MissingError('Fichier ou dossier pCloud absent.');
+    if(data.result===2004)throw new ConflictError('Le nom existe déjà sur pCloud. Aucun écrasement.');
+    if(data.result===2006)throw new NotEmptyError('Le dossier pCloud contient encore des fichiers.');
     if(data.result!==0)throw new Error({2008:'Espace pCloud insuffisant.',2003:'Accès au dossier pCloud refusé.',2005:'Dossier pCloud absent.',2009:'Fichier pCloud absent.'}[data.result]||`Erreur pCloud ${data.result??'inconnue'} (${method}).`);
     return data;
   }
@@ -47,6 +53,12 @@ export class BrowserPCloud{
   async retry(attempt,error){const delay=Math.max(Math.min(60000,2000*2**attempt+Math.random()*1000),error.delay||0);this.notify(`Nouvel essai dans ${Math.ceil(delay/1000)} s. ${error.message}`);await wait(delay,this.signal);}
   async folder(parent,name){return (await this.call('createfolderifnotexists',{folderid:parent,name})).metadata.folderid;}
   async contents(folderid){return (await this.call('listfolder',{folderid})).metadata.contents||[];}
+  async stat(fileid){return (await this.call('stat',{fileid})).metadata;}
+  async copy(fileid,folderid,name,captured){
+    const fields={fileid,tofolderid:folderid,toname:name,noover:1};
+    if(captured!=null){fields.ctime=captured;fields.mtime=captured;}
+    return (await this.call('copyfile',fields)).metadata;
+  }
   async upload(object,blob,folderid){
     const body=new FormData();
     // Parameters precede the file, as required by pCloud's multipart API.

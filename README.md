@@ -55,27 +55,43 @@ Le journal est dans **IndexedDB**, sous le nom `passage-photos-browser-v1`. Le b
 
 **Sauvegardez régulièrement le journal de reprise en JSON**, conservez-le hors des données du navigateur et gardez les ZIP jusqu'à validation. **Restaurer un journal** permet de le réimporter, y compris dans un autre profil. Une restauration remet les objets en attente afin de vérifier à nouveau leur présence distante ; elle ne les renvoie pas s'ils sont retrouvés intacts. Le jeton pCloud ne figure jamais dans cette sauvegarde.
 
-Le journal du navigateur et le SQLite de l'ancienne version Python sont indépendants. Le navigateur n'importe pas les fichiers SQLite. La structure distante des contenus reste compatible : un fichier déjà présent dans le même dossier déterministe est vérifié avant tout nouvel envoi.
+Le journal du navigateur et le SQLite de l'ancienne version Python sont indépendants. Le navigateur n'importe pas les fichiers SQLite. Une copie déjà présente dans les anciens sous-dossiers techniques peut être réconciliée par ses empreintes avant un nouvel envoi.
 
 ## Fiabilité et absence de doublons
 
 1. Chaque entrée du ZIP est lue en flux, contrôlée par **CRC**, puis identifiée par **SHA-256, SHA-1 et taille**. Les ZIP64 sont pris en charge par zip.js ; pas les ensembles de volumes `.z01`/`.zip.001` ni les ZIP chiffrés.
 2. L'objet et sa provenance sont enregistrés ensemble dans une transaction IndexedDB à durabilité stricte. Une archive interrompue reste incomplète et bloque le transfert jusqu'à la fin de son analyse.
 3. Des octets identiques, y compris les copies d'albums, partagent un seul objet. Les provenances et noms originaux restent dans le manifeste.
-4. Un sous-dossier déterministe utilise le SHA-256 complet :
+4. Le résultat final permet une consultation directe dans pCloud :
 
    ```text
-   Dossier choisi/Fichiers/ab/ab...SHA256 complet.../IMG_0001.jpg
+   Dossier choisi/IMG_0001.jpg
+   Dossier choisi/VIDEO_0001.mp4
+   Dossier choisi/Métadonnées Takeout/IMG_0001.jpg.json
+   Dossier choisi/Autres fichiers/...
    ```
 
-5. Avant chaque envoi et chaque tentative, le programme inspecte ce sous-dossier. S'il contient le fichier attendu, son contenu est contrôlé puis validé. Un contenu différent provoque une erreur sans écrasement volontaire.
-6. L'envoi utilise `nopartial=1` et le même nom déterministe, sans création automatique de noms `photo (2).jpg`. La présence distante est réconciliée après une réponse perdue.
+5. Pour sécuriser l'envoi, un fichier passe provisoirement par `Fichiers/préfixe/SHA256/nom`. Avant chaque envoi et nouvelle tentative, cette copie est recherchée et contrôlée. Une réception dont la réponse a été perdue n'entraîne pas un second envoi.
+6. La copie reçue est publiée côté pCloud vers son nom final avec `copyfile(noover=1)`. Le nom et les identifiants de l'opération sont enregistrés dans le journal avant cette étape. Après vérification de la copie finale, son nouvel identifiant est enregistré avant le retrait de l'ancienne copie technique. Une interruption pendant la copie ou ce retrait se réconcilie à la reprise. La destination n'est jamais écrasée ; une réponse de copie perdue se résout par contrôle du nom exact enregistré. [Copie sans écrasement pCloud](https://docs.pcloud.com/methods/file/copyfile.html).
 7. Un objet est marqué **vérifié** uniquement après comparaison de sa taille et de ses empreintes. En Europe, pCloud fournit SHA-256. Aux États-Unis, la page relit le téléchargement distant pour calculer SHA-256. **Relire aussi tous les octets distants** impose cette relecture même en Europe.
 8. Un verrou Web Locks empêche deux onglets de cette application d'effectuer simultanément des opérations sur le même journal. Le compte pCloud et sa région sont liés à la destination.
 
-Le dossier principal reste suivi par son `folderid`. Vous pouvez le renommer librement sur pCloud. L'interface conserve son nom initial à titre indicatif. Ne supprimez ni ne réorganisez les sous-dossiers techniques pendant la migration. Évitez d'écrire dans cette destination depuis un autre outil pendant les envois : pCloud ne fournit pas ici de verrou distribué ni d'écriture conditionnelle.
+Le dossier principal reste suivi par son `folderid`. Vous pouvez le renommer librement sur pCloud. L'interface conserve son nom initial à titre indicatif. Pendant la migration, ne déplacez pas les fichiers ou sous-dossiers techniques depuis un autre outil. La copie finale protège contre un nom déjà occupé, mais aucun verrou ne peut empêcher un autre client de modifier un fichier après son contrôle.
 
-Cette structure crée beaucoup de sous-dossiers et ne reproduit pas les albums comme fonctionnalités pCloud. C'est le compromis qui conserve les homonymes tout en rendant les envois idempotents. Les noms ordinaires et accents sont conservés ; caractères interdits et noms dépassant 1000 octets UTF-8 sont adaptés. Le manifeste conserve le chemin original exact.
+Les photos et vidéos reconnues sont regroupées directement dans le dossier choisi. Les noms ordinaires et accents sont conservés. Si un nom est déjà pris par un autre contenu, un suffixe stable contenant le SHA-256 complet distingue le fichier, par exemple `IMG_0001 [empreinte].jpg`. Les caractères interdits et les noms dépassant 1000 octets UTF-8 sont adaptés ; le manifeste conserve le chemin original exact. Les albums ne sont pas recréés comme fonctions pCloud. Les JSON restent conservés, à part, car ils peuvent contenir des dates et informations absentes des médias.
+
+### Corriger un transfert commencé avec l'ancien rangement
+
+1. Mettez le transfert en pause et sauvegardez le journal de reprise.
+2. Rechargez le site avec **Ctrl + F5**, dans le même navigateur et le même profil. Fermez les autres anciens onglets de l'application.
+3. Reconnectez le même compte pCloud si nécessaire.
+4. Cliquez sur **Regrouper les fichiers déjà reçus**. Les copies connues sont regroupées côté pCloud, sans renvoi depuis les ZIP. Les JSON vont dans leur dossier séparé. L'opération peut être interrompue puis relancée.
+5. S'il reste des fichiers à transférer, sélectionnez de nouveau leurs ZIP et reprenez le transfert. La reprise applique aussi le nouveau rangement aux copies déjà reçues.
+6. Refaites le contrôle final et exportez un nouveau journal : les identifiants des fichiers finaux ont changé. Un ancien journal restauré doit réconcilier ces copies avant tout envoi, comme vérifié dans les tests.
+
+Une copie et sa source technique peuvent coexister brièvement pendant la validation. Prévoyez au moins la place d'un fichier supplémentaire sur pCloud. Les anciennes copies techniques sont retirées après contrôle, mais leurs révisions ou éléments en corbeille suivent les règles de conservation pCloud ; l'application ne vide pas cette corbeille. Elle ne supprime jamais récursivement un dossier : seuls les dossiers techniques vides sont retirés. Un sous-dossier contenant un fichier ajouté manuellement reste en place.
+
+Le regroupement ne retélécharge pas les ZIP et ne renvoie pas les médias, mais ses vérifications peuvent relire les fichiers distants, notamment pour SHA-256 aux États-Unis. Si vous devez revenir à l'ancien code, le journal et les fichiers restent lisibles ; conservez la sauvegarde d'avant regroupement et les ZIP. Cette sauvegarde peut être restaurée dans la version actuelle pour réconcilier les nouveaux identifiants sans recréer les anciennes copies.
 
 ## Disque, mémoire et gros volumes
 
@@ -182,6 +198,7 @@ docs/app.js                  Actions utilisateur, états, exports
 docs/browser-auth.js         OAuth pCloud navigateur, sans Client Secret
 docs/browser-state.js        IndexedDB, sauvegarde et restauration
 docs/browser-engine.js       ZIP, empreintes, OPFS et reprise
+docs/browser-layout.js       Rangement direct, noms en conflit et reprise du regroupement
 docs/browser-pcloud.js       API pCloud, nouvelles tentatives et vérification
 docs/vendor/                 zip.js et noble-hashes, versions figées, licences incluses
 extension/                   Extension MV3 : contrôle du bilan et commandes Google Photos

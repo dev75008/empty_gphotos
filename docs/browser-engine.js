@@ -1,6 +1,7 @@
 import {ZipReader,BlobReader,BlobWriter,configure,sha256,sha1,bytesToHex} from './vendor/archive.js';
-import {BrowserPCloud,Retryable,AuthError,abort} from './browser-pcloud.js';
-import {cleanupState,inventoryFingerprint} from './cleanup.js';
+import {BrowserPCloud,Retryable,AuthError,abort} from './browser-pcloud.js?v=5';
+import {cleanupState,inventoryFingerprint} from './cleanup.js?v=5';
+import {FlatLayout} from './browser-layout.js';
 configure({useWebWorkers:false,useCompressionStream:true,chunkSize:1024*1024});
 const text=new TextEncoder();
 const parent=path=>path.includes('/')?path.slice(0,path.lastIndexOf('/')):'.';
@@ -191,13 +192,19 @@ export class BrowserMigration{
   }
   async verified(object,fileid){await this.save({...this.objects.get(object.id),fileid,status:'verified',error:null,checked:new Date().toISOString()});}
   async transferOne(client,object,root,signal){
+    if(await this.layout.reuse(object))return;
+    if(object.layout==='flat-v1'&&!object.publication){
+      object={...this.objects.get(object.id),fileid:null,folderid:null,layout:null,name:object.original_name||object.name};
+      await this.save(object);
+    }
     for(let attempt=0;attempt<6;attempt++){
       let staged;
       try{
         const folderid=await this.folder(client,object,root),contents=await client.contents(folderid);
         if(contents.length){
           if(contents.length!==1||contents[0].isfolder||!await client.matches(object,contents[0].fileid))throw new Error('Contenu distant inattendu ou corrompu. Aucun écrasement : inspectez ce sous-dossier sur pCloud.');
-          await this.verified(object,contents[0].fileid);return;
+          await this.save({...this.objects.get(object.id),fileid:contents[0].fileid,status:'staged',error:null});
+          await this.layout.publish(this.objects.get(object.id));return;
         }
         abort(signal);
         const entry=await this.source(object);
@@ -208,7 +215,7 @@ export class BrowserMigration{
         const fileid=await client.upload(object,staged.blob,folderid);
         await this.save({...this.objects.get(object.id),fileid});
         if(!await client.matches(object,fileid))throw new Error('Empreintes différentes après envoi. Validation refusée.');
-        await this.verified(object,fileid);return;
+        await this.layout.publish(this.objects.get(object.id));return;
       }catch(error){abort(signal);if(!(error instanceof Retryable)||attempt===5)throw error;await client.retry(attempt,error);}
       finally{await staged?.release();}
     }
@@ -217,17 +224,51 @@ export class BrowserMigration{
     await this.setting('cleanup-audit',null);
     if(!this.objects.size||[...this.archives.values()].some(row=>!row.complete))throw new Error('Analysez complètement les archives avant le transfert.');
     await this.prepare(signal);const client=this.client(signal),root=await this.bind(client,signal);let failures=0;
+    this.layout=new FlatLayout(this,client,root,signal);
     for(const object of this.objects.values()){
-      abort(signal);if(object.status==='verified')continue;
+      abort(signal);if(object.status==='verified'&&object.layout==='flat-v1'&&!object.publication)continue;
       this.log('Transfert : '+object.name);
-      try{await this.transferOne(client,object,root,signal);}
+      try{
+        if(object.publication||object.fileid!=null&&object.layout!=='flat-v1')await this.layout.publish(object);
+        else await this.transferOne(client,object,root,signal);
+      }
       catch(error){abort(signal);await this.save({...this.objects.get(object.id),status:'error',error:error.message});if(error instanceof AuthError||error instanceof Retryable)throw error;failures++;this.log('Erreur : '+error.message);}
       this.notify();
     }
     if(failures)throw new Error(`${failures} fichier(s) restent en erreur. Consultez le journal puis reprenez.`);
+    await this.layout.removeEmptyContainers();
+  }
+  async organize(signal){
+    await this.setting('cleanup-audit',null);
+    if(!this.settings.binding)throw new Error('Aucun dossier de transfert connu.');
+    const client=this.client(signal),root=await this.bind(client,signal);
+    this.layout=new FlatLayout(this,client,root,signal);let failures=0;
+    for(const object of this.objects.values()){
+      abort(signal);if(object.layout==='flat-v1'&&!object.publication||object.fileid==null&&object.folderid==null)continue;
+      try{
+        if(object.fileid==null&&!object.publication){
+          const files=await client.contents(object.folderid);
+          if(!files.length)continue;
+          if(files.length!==1||files[0].isfolder||!await client.matches(object,files[0].fileid))throw new Error('Le sous-dossier reçu contient un fichier inattendu.');
+          await this.save({...object,fileid:files[0].fileid,status:'staged'});
+        }
+        this.log('Regroupement sur pCloud : '+object.name);
+        await this.layout.publish(this.objects.get(object.id));
+      }catch(error){
+        abort(signal);await this.save({...this.objects.get(object.id),status:'error',error:error.message});
+        if(error instanceof AuthError||error instanceof Retryable)throw error;
+        // A missing staging folder can be recovered by resuming with the ZIP;
+        // never pretend that a missing file was successfully reorganized.
+        failures++;this.log('Erreur : '+error.message);
+      }
+      this.notify();
+    }
+    if(failures)throw new Error(`${failures} fichier(s) n’ont pas pu être regroupés. Reprenez après vérification.`);
+    await this.layout.removeEmptyContainers();
   }
   async verify(signal,deep=false){
     await this.setting('cleanup-audit',null);
+    if([...this.objects.values()].some(object=>object.publication))throw new Error('Terminez le regroupement avant le contrôle final.');
     if(!this.settings.binding||!this.objects.size)throw new Error('Aucun transfert à contrôler.');
     const client=this.client(signal);await this.bind(client,signal);let failures=0,index=0;
     for(const object of this.objects.values()){
@@ -244,14 +285,15 @@ export class BrowserMigration{
       inventory:inventoryFingerprint(this.objects,this.archives,this.settings.binding)});
   }
   snapshot(){
-    let verified=0,errors=0,size=0,verifiedBytes=0;const errorRows=[];
+    let verified=0,errors=0,size=0,verifiedBytes=0,toOrganize=0;const errorRows=[];
     for(const object of this.objects.values()){
       size+=object.size;
       if(object.status==='verified'){verified++;verifiedBytes+=object.size;}
       if(object.status==='error'){errors++;if(errorRows.length<10)errorRows.push({name:object.name,error:object.error});}
+      if(object.publication||object.layout!=='flat-v1'&&(object.folderid!=null||object.fileid!=null))toOrganize++;
     }
     return {settings:{paths:this.selected.map(file=>file.name),folder:this.settings.folder},
-      database:{total:this.objects.size,verified,remaining:this.objects.size-verified,errors,bytes:size,verified_bytes:verifiedBytes,
+      database:{total:this.objects.size,verified,remaining:this.objects.size-verified,errors,bytes:size,verified_bytes:verifiedBytes,to_organize:toOrganize,
         archives:[...this.archives.values()].map(row=>({...row,path:row.name})),binding:this.settings.binding||null,error_rows:errorRows},
       pcloud:{configured:Boolean(this.settings.client_id),connected:Boolean(this.identity&&this.auth),userid:this.identity?.userid,hostname:this.auth?.host},
       job:this.job,logs:this.logs,log_sequence:this.sequence,

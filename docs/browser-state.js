@@ -71,6 +71,8 @@ export function validateBackup(data){
   for(const row of data.objects){
     if(!hex.test(row.id)||row.sha256!==row.id||!/^[a-f0-9]{40}$/.test(row.sha1)||!Number.isSafeInteger(row.size)||row.size<0||typeof row.name!=='string'||/[\0/\\]/.test(row.name)||ids.has(row.id))throw new Error('Le journal contient un fichier invalide.');
     for(const field of ['fileid','folderid'])if(row[field]!=null&&(!Number.isSafeInteger(row[field])||row[field]<0))throw new Error('Identifiant pCloud invalide dans le journal.');
+    if(row.destination&&(!Number.isSafeInteger(row.destination.folderid)||row.destination.folderid<0||typeof row.destination.name!=='string'||/[\0/\\]/.test(row.destination.name)))throw new Error('Destination de regroupement invalide.');
+    if(row.publication&&['sourceid','sourcefolder'].some(field=>!Number.isSafeInteger(row.publication[field])||row.publication[field]<0))throw new Error('État de regroupement invalide.');
     ids.add(row.id);
   }
   const archives=new Set(data.archives.map(row=>row.id));

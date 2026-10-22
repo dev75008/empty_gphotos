@@ -5,7 +5,7 @@ import {ZipWriter,BlobWriter,TextReader} from '@zip.js/zip.js';
 import {openJournal,validateBackup} from '../docs/browser-state.js';
 import {BrowserMigration} from '../docs/browser-engine.js';
 import {sha256,bytesToHex} from '../docs/vendor/archive.js';
-import {BrowserPCloud,Retryable,AuthError} from '../docs/browser-pcloud.js';
+import {BrowserPCloud,Retryable,AuthError,MissingError,ConflictError,NotEmptyError} from '../docs/browser-pcloud.js?v=5';
 import {consumeCallback,sessionAuth} from '../docs/browser-auth.js';
 import {cleanupChecklist,AUDIT_LIFETIME} from '../docs/cleanup.js';
 import {validateProof} from '../extension/proof.js';
@@ -16,10 +16,40 @@ async function zip(entries,name='takeout.zip',options={}){
   return new File([await writer.close()],name);
 }
 class Cloud{
-  constructor(){this.files=new Map();this.folders=new Map();this.next=1;this.uploads=0;this.lost=false;this.stop=null;this.userid=12;}
-  async call(method){if(method==='userinfo')return{userid:this.userid};if(method==='listfolder')return{metadata:{}};throw new Error(method);}
+  constructor(){this.files=new Map();this.folders=new Map();this.next=1;this.uploads=0;this.copies=0;this.lost=false;this.stop=null;this.userid=12;this.lists=new Map();}
+  async call(method,fields={}){
+    if(method==='userinfo')return{userid:this.userid};
+    if(method==='listfolder'){
+      const row=[...this.folders].find(([,id])=>id===fields.folderid);
+      if(!row)throw new MissingError('Missing folder');
+      return{metadata:{folderid:row[1],name:row[0].slice(row[0].indexOf('/')+1),contents:await this.contents(row[1])}};
+    }
+    if(method==='deletefile'){
+      if(!this.files.has(fields.fileid))throw new MissingError('Missing file');
+      this.files.delete(fields.fileid);
+      if(this.stopDelete){this.stopDelete.abort(new DOMException('Pause','AbortError'));this.stopDelete=null;throw new Retryable('Lost delete receipt');}
+      return{};
+    }
+    if(method==='deletefolder'){
+      const row=[...this.folders].find(([,id])=>id===fields.folderid);
+      if(!row)throw new MissingError('Missing folder');
+      if([...this.files.values()].some(file=>file.folderid===fields.folderid)||[...this.folders.keys()].some(key=>key.startsWith(fields.folderid+'/')))throw new NotEmptyError('Not empty');
+      this.folders.delete(row[0]);return{};
+    }
+    throw new Error(method);
+  }
   async folder(parent,name){const key=parent+'/'+name;if(!this.folders.has(key))this.folders.set(key,this.next++);return this.folders.get(key);}
-  async contents(folderid){return [...this.files.values()].filter(file=>file.folderid===folderid);}
+  async contents(folderid){this.lists.set(folderid,(this.lists.get(folderid)||0)+1);return [...this.files.values()].filter(file=>file.folderid===folderid).map(file=>({...file,size:file.payload.length,parentfolderid:folderid}));}
+  async stat(fileid){const file=this.files.get(fileid);if(!file)throw new MissingError('Missing file');return{...file,parentfolderid:file.folderid};}
+  async copy(fileid,folderid,name,captured){
+    if([...this.files.values()].some(file=>file.folderid===folderid&&file.name===name))throw new ConflictError('Exists');
+    const source=this.files.get(fileid);if(!source)throw new MissingError('Missing source');
+    const id=this.next++;this.copies++;const file={...source,fileid:id,folderid,name,captured,payload:source.payload.slice()};this.files.set(id,file);
+    if(this.corruptCopy)file.payload=new TextEncoder().encode('bad copy');
+    if(this.lostCopy){this.lostCopy=false;throw new Retryable('Lost copy receipt');}
+    if(this.stopCopy){this.stopCopy.abort(new DOMException('Pause','AbortError'));this.stopCopy=null;throw new Retryable('Stopped after copy');}
+    return{...file,parentfolderid:folderid,size:file.payload.length};
+  }
   async upload(object,blob,folderid){
     this.uploads++;const fileid=this.next++;
     this.files.set(fileid,{fileid,folderid,name:object.name,payload:new Uint8Array(await blob.arrayBuffer())});
@@ -35,6 +65,101 @@ async function setup(){
   engine.auth={host:'eapi.pcloud.com',token:'dummy'};engine.client=()=>cloud;
   return{journal,cloud,engine,signal:new AbortController().signal};
 }
+async function legacy(entries){
+  const state=await setup(),{engine,cloud,signal}=state;
+  await engine.select([await zip(entries)]);await engine.scan(signal);
+  const root=await engine.bind(cloud,signal);
+  for(const object of engine.objects.values()){
+    const folder=await engine.folder(cloud,object,root),entry=await engine.source(object);
+    const blob=await entry.getData(new BlobWriter());
+    await engine.verified(object,await cloud.upload(object,blob,folder));
+  }
+  await engine.select([]);return state;
+}
+
+test('Legacy files regroup remotely with JSON separated; an older backup restores without uploads',async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'2020/photo.jpg':'one','2021/photo.jpg':'two','photo.json':'metadata','video.mp4':'video'});
+  const backup=await journal.backup(),uploads=cloud.uploads;
+  assert.equal(engine.snapshot().database.to_organize,4);
+  await engine.organize(signal);
+  const root=engine.settings.binding.folderid;
+  assert.equal([...cloud.files.values()].filter(file=>file.folderid===root).length,3);
+  assert.equal(cloud.files.size,4);assert.equal(cloud.uploads,uploads);
+  assert.equal(engine.snapshot().database.to_organize,0);
+  assert.equal([...cloud.folders.keys()].some(key=>key.endsWith('/Fichiers')),false);
+  await journal.restore(backup);await engine.load();await engine.run(signal);
+  assert.equal(cloud.files.size,4);assert.equal(cloud.uploads,uploads);
+  assert.equal(engine.snapshot().database.verified,4);journal.db.close();
+});
+
+test('Lost server-copy receipt is reconciled without duplicate or second upload',async()=>{
+  const {engine,cloud,journal,signal}=await setup();
+  await engine.select([await zip({'photo.jpg':'photo'})]);await engine.scan(signal);cloud.lostCopy=true;
+  await engine.run(signal);
+  assert.equal(cloud.uploads,1);assert.equal(cloud.copies,1);assert.equal(cloud.files.size,1);
+  assert.equal(engine.snapshot().database.verified,1);journal.db.close();
+});
+
+for(const phase of ['stopCopy','stopDelete'])test(`Reorganization resumes after ${phase} with no ZIP and no loss`,async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'photo.jpg':'photo'});
+  const controller=new AbortController();cloud[phase]=controller;
+  await assert.rejects(engine.organize(controller.signal));
+  assert.equal(Boolean([...engine.objects.values()][0].publication),true);
+  await assert.rejects(engine.verify(signal,true),/regroupement/);
+  const resumed=new BrowserMigration(journal);await resumed.load();resumed.auth=engine.auth;resumed.client=()=>cloud;
+  await resumed.organize(signal);
+  assert.equal(cloud.uploads,1);assert.equal(cloud.copies,1);assert.equal(cloud.files.size,1);
+  assert.equal(resumed.snapshot().database.verified,1);assert.equal(resumed.snapshot().database.to_organize,0);journal.db.close();
+});
+
+test('A bad regrouped copy never removes its original and cannot be silently overwritten',async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'photo.jpg':'photo'});
+  const source=[...cloud.files.keys()][0];cloud.corruptCopy=true;
+  await assert.rejects(engine.organize(signal));
+  assert.equal(new TextDecoder().decode(cloud.files.get(source).payload),'photo');
+  assert.equal(engine.snapshot().database.verified,0);
+  await assert.rejects(engine.organize(signal));assert.equal(cloud.copies,1);
+  for(const [id] of cloud.files)if(id!==source)cloud.files.delete(id);
+  cloud.corruptCopy=false;await engine.organize(signal);
+  assert.equal(cloud.files.size,1);assert.equal(cloud.uploads,1);journal.db.close();
+});
+
+test('An occupied original filename is preserved and the media gets a stable hash suffix',async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'photo.jpg':'photo'}),root=engine.settings.binding.folderid;
+  cloud.files.set(999,{fileid:999,folderid:root,name:'photo.jpg',payload:new TextEncoder().encode('user file')});
+  await engine.organize(signal);
+  assert.equal(new TextDecoder().decode(cloud.files.get(999).payload),'user file');
+  const object=[...engine.objects.values()][0];assert.equal(object.name,`photo [${object.id}].jpg`);
+  assert.equal(cloud.files.size,2);await engine.organize(signal);assert.equal(cloud.files.size,2);journal.db.close();
+});
+
+test('A concurrent filename conflict cannot overwrite the competing file or lose the source',async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'photo.jpg':'photo'}),source=[...cloud.files.keys()][0];
+  const copy=cloud.copy.bind(cloud);
+  cloud.copy=async(fileid,folderid,name,captured)=>{
+    cloud.files.set(999,{fileid:999,folderid,name,payload:new TextEncoder().encode('concurrent file')});
+    return copy(fileid,folderid,name,captured);
+  };
+  await assert.rejects(engine.organize(signal));
+  assert.equal(new TextDecoder().decode(cloud.files.get(999).payload),'concurrent file');
+  assert.equal(new TextDecoder().decode(cloud.files.get(source).payload),'photo');journal.db.close();
+});
+
+test('Regrouping removes only its verified technical copy and preserves unrelated files in the old folder',async()=>{
+  const {engine,cloud,journal,signal}=await legacy({'photo.jpg':'photo'}),old=[...engine.objects.values()][0].folderid;
+  cloud.files.set(999,{fileid:999,folderid:old,name:'user-added.txt',payload:new TextEncoder().encode('keep me')});
+  await engine.organize(signal);
+  assert.equal(new TextDecoder().decode(cloud.files.get(999).payload),'keep me');
+  assert.equal(cloud.files.size,2);assert.equal(engine.snapshot().database.verified,1);
+  assert.equal([...cloud.folders.values()].includes(old),true);journal.db.close();
+});
+
+test('Flat folder listings stay bounded instead of repeating the whole gallery for every upload',async()=>{
+  const {engine,cloud,journal,signal}=await setup();
+  await engine.select([await zip(Object.fromEntries(Array.from({length:25},(_,i)=>[`photo-${i}.jpg`,`photo-${i}`])))]);await engine.scan(signal);await engine.run(signal);
+  assert.equal(cloud.lists.get(engine.settings.binding.folderid),1);
+  assert.equal(cloud.files.size,25);journal.db.close();
+});
 
 test('Cleanup requires fresh full verification and every manual confirmation; restore invalidates it',async()=>{
   const {engine,journal,signal,cloud}=await setup();
@@ -69,7 +194,11 @@ test('Browser engine hashes ZIPs, deduplicates albums, keeps homonyms and dates'
   await engine.run(signal);assert.equal(cloud.uploads,3);assert.equal(engine.snapshot().database.verified,3);
   await engine.run(signal);assert.equal(cloud.uploads,3);
   await engine.verify(signal,true);
-  assert.equal([...cloud.files.values()].filter(file=>file.name==='été.jpg').length,2);
+  assert.equal([...cloud.files.values()].filter(file=>file.name==='été.jpg').length,1);
+  const root=engine.settings.binding.folderid;
+  assert.equal([...cloud.files.values()].filter(file=>file.folderid===root).length,2);
+  assert.equal([...engine.objects.values()].filter(object=>object.original_name==='été.jpg').length,2);
+  assert.equal([...cloud.files.values()].find(file=>file.name.endsWith('.json')).folderid,engine.settings.folders.metadata);
   journal.db.close();
 });
 

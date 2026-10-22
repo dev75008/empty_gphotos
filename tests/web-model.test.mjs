@@ -34,3 +34,14 @@ test('Pause, errors, busy jobs and missing connection retain truthful states', (
   assert.equal(jobLabel(status.job), 'Contrôle terminé');
   assert.equal(readiness(status, false).auth, false);
 });
+
+test('A completed legacy journal can reorganize without uploading ZIPs; a busy or disconnected journal cannot',()=>{
+  const status=emptyStatus();status.database={...status.database,total:3,verified:3,remaining:0,to_organize:3,binding:{folderid:1},archives:[{complete:true}]};
+  assert.equal(readiness(status,true).organize,false);
+  status.pcloud.connected=true;
+  assert.equal(readiness(status,true).organize,true);assert.equal(readiness(status,true).run,true);
+  status.job={command:'organize',running:true,exit_code:null};
+  assert.equal(jobLabel(status.job),'Regroupement');assert.equal(readiness(status,true).organize,false);
+  status.job={command:'organize',running:false,exit_code:0};status.database.to_organize=0;
+  assert.equal(jobLabel(status.job),'Regroupement terminé');assert.equal(readiness(status,true).run,false);
+});
