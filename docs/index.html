@@ -9,7 +9,7 @@
   <title>Passage Photos · Google Photos vers pCloud</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css?v=3">
-  <script type="module" src="./app.js?v=3"></script>
+  <script type="module" src="./app.js?v=4"></script>
 </head>
 <body>
   <a href="#main" class="skip">Aller au transfert</a>
@@ -39,7 +39,8 @@
         <section class="step" aria-labelledby="pcloud-title">
           <div class="step-header"><span class="step-number">1</span><div><h2 id="pcloud-title">Connecter pCloud</h2><p id="pcloud-description">Le compte qui recevra vos photos et vidéos.</p></div><span id="pcloud-state" class="step-state">À préparer</span></div>
           <div class="step-body">
-            <button id="auth-button" class="button secondary" disabled>Connecter mon compte pCloud</button>
+            <button id="auth-button" class="button secondary" aria-describedby="auth-hint" disabled>Connecter mon compte pCloud</button>
+            <p id="auth-hint" class="small" role="status">Pour activer ce bouton, ouvrez « Configurer mon application pCloud » ci-dessous, saisissez le Client ID puis cliquez sur « Enregistrer le Client ID ».</p>
             <details id="credentials-details"><summary>Configurer mon application pCloud</summary>
               <p>Créez une application dans <a href="https://docs.pcloud.com/my_apps/" target="_blank" rel="noopener noreferrer">pCloud Developers</a>. Ajoutez cette URI de redirection :</p>
               <div class="copy-row"><code id="redirect-uri">https://dev75008.github.io/empty_gphotos/</code><button id="copy-redirect" class="text-button">Copier</button></div>

@@ -50,6 +50,7 @@ function render(){
   $('pcloud-description').textContent=pcloud.connected?`Compte pCloud ${pcloud.userid} · ${pcloud.hostname==='eapi.pcloud.com'?'Europe':'États-Unis'}`:'Le compte qui recevra vos photos et vidéos.';
   $('auth-button').textContent=pcloud.connected?'Reconnecter pCloud':'Connecter mon compte pCloud';
   $('auth-button').disabled=!ready.auth||pending;
+  $('auth-hint').textContent=!supported?'Le navigateur n’est pas prêt. Si ce message persiste, consultez le message d’erreur en haut de la page.':busy?'Attendez la fin de l’opération en cours pour connecter pCloud.':!pcloud.configured?'Pour activer ce bouton, ouvrez « Configurer mon application pCloud » ci-dessous, saisissez le Client ID puis cliquez sur « Enregistrer le Client ID ».':pcloud.connected?'Compte connecté. Vous pouvez choisir vos archives Takeout.':'Client ID enregistré. Cliquez sur « Connecter mon compte pCloud » pour autoriser l’accès chez pCloud.';
   $('credentials-fields').disabled=!ready.edit||pending;
   $('pick-button').disabled=!ready.edit||pending;$('zip-files').disabled=!ready.edit||pending;
   $('scan-button').disabled=!ready.scan||pending;
