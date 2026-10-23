@@ -239,28 +239,32 @@ Les tests du moteur utilisent IndexedDB simulé, de vrais ZIP et un simulateur p
 L'ancien outil Python reste disponible séparément dans [son guide CLI](README-python.md). Il n'est pas nécessaire pour le site.
 ## Script console Google Photos
 
-Dans Passage Photos, la section **Nettoyer Google Photos avec le script console**
-ouvre Google Photos et permet de copier ou télécharger le script de sélection
-globale, adapté du script par journées fourni par l’utilisateur. La connexion reste chez Google : aucun accès Google,
-jeton OAuth ou mot de passe n’est transmis à Passage Photos.
+La section **Nettoyer Google Photos avec le script console** propose le nouveau
+script fourni par l’utilisateur, dans `docs/google-photos-corbeille.txt`.
+Il utilise les cases `role="checkbox"`, avec des lots de 1 000 au départ.
+Le fichier téléchargeable est l’original : **SUPPRIMER = false**, sélection seule.
 
-Dans Google Photos, ouvrez la vue principale Photos puis F12 → Console. Relisez
-le script. Si Chrome bloque le collage, tapez manuellement `allow pasting`, puis
-Entrée. Collez ensuite le script et appuyez sur Entrée : la sélection démarre
-immédiatement. Le script fait défiler la grille et sélectionne les journées
-accessibles avant une seule demande de mise à la corbeille. Il vérifie les clics,
-effectue un second passage de contrôle, et attend plusieurs observations stables
-du bas sans indicateur de chargement. Une limite de défilement
-ou une erreur l’arrête ; il ne fractionne pas la sélection et ne réessaie pas la
-suppression. Google peut refuser une sélection trop grande. Pour arrêter, rechargez l’onglet ; une opération déjà
-envoyée peut encore aboutir. Le site ne peut ni exécuter ce texte dans un autre
-onglet ni désactiver la protection Chrome.
+1. Ouvrez Google Photos depuis le site et vérifiez le bon compte.
+2. Copiez le script en mode test. Dans Google Photos : F12 → Console. Si Chrome
+   bloque le collage, relisez le script puis tapez manuellement `allow pasting`
+   et Entrée. Collez le script, puis Entrée pour démarrer.
+3. Le test sélectionne jusqu’à 1 000 cases puis s’arrête sans supprimer. Vérifiez
+   le nombre affiché par Google et le message « Bouton corbeille trouvé ».
+4. Pour envoyer les médias à la corbeille, rechargez Google Photos afin d’annuler
+   la sélection du test. Dans Passage Photos, cochez **Activer la mise à la
+   corbeille**, puis copiez et lancez à nouveau le script. Cette option change
+   uniquement `const SUPPRIMER = false;` en `const SUPPRIMER = true;`.
+   Elle est décochée à chaque rechargement du site.
 
-Ce mode est indépendant du contrôle pCloud et ne certifie aucune sauvegarde.
-La version adaptée est dans `docs/google-photos-corbeille.txt`.
-Elle ne vide pas la corbeille et ne traite pas
-séparément les Archives, le dossier verrouillé ou les éléments seulement partagés.
-Son compteur concerne des journées sélectionnées, pas un nombre de médias vérifiés.
-La confirmation envoyée ne garantit pas que tout le compte est vide. Vérifiez les
-vues concernées et vos copies avant le vidage définitif de toute la corbeille,
-anciens éléments compris. La suppression peut toucher les appareils synchronisés.
+En mode suppression, le script enchaîne les lots et réduit leur taille si la
+confirmation échoue. Pour arrêter, rechargez Google Photos ; une action déjà
+transmise peut encore aboutir. Ne lancez pas plusieurs copies simultanément.
+Le script ne vide pas la corbeille. Les Archives, le dossier verrouillé et les
+éléments seulement partagés ne sont pas traités séparément. Les compteurs
+mesurent les clics, pas une preuve de suppression ni une couverture exhaustive.
+
+Ce mode est indépendant de l’audit pCloud et ne vérifie aucune sauvegarde. La
+connexion reste chez Google ; aucun accès Google ni jeton OAuth n’est transmis
+au site. Le site fournit du texte et ne peut pas l’exécuter dans un autre onglet.
+Avant le vidage définitif de toute la corbeille, vérifiez vos copies, les anciens
+éléments et l’effet sur les appareils synchronisés.

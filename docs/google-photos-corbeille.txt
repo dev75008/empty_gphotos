@@ -1,12 +1,12 @@
 (async () => {
+  const SUPPRIMER = false;   // false = test (sélectionne seulement). true = supprime vraiment.
+  const LOT = 1000;          // nombre de photos par lot
   const PAUSE = 1500;
-  const DEFILEMENTS_MAX = 100000;
-  const FIN_STABLE = 4;
+  const MAX_TOURS = 2000;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  const chemin = () => location.pathname.replace(/^\/u\/\d+(?=\/|$)/, '').replace(/\/+$/, '') || '/';
-  if (location.origin !== 'https://photos.google.com' || !['/', '/photos'].includes(chemin())) {
-    console.error('⛔ Ouvre la page principale "Photos" (pas la corbeille, un album, une recherche...), puis relance.');
+  if (!/photos\.google\.com\/?(u\/\d+\/?)?(\?.*)?$/.test(location.href)) {
+    console.error('⛔ Ouvre la page principale "Photos" (pas la corbeille, un album, une recherche), puis relance.');
     return;
   }
 
@@ -16,21 +16,11 @@
      (el.getAttribute('data-tooltip') || '')).trim();
 
   const visible = el => {
-    if (!el) return false;
     const r = el.getBoundingClientRect();
     const s = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight &&
            s.visibility !== 'hidden' && s.display !== 'none';
   };
-
-  const REGEX_JOUR = /^(Sélectionner toutes les photos|Select all photos)/i;
-  const estCoche = el =>
-    el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-pressed') === 'true';
-
-  const boutonsJour = () =>
-    [...document.querySelectorAll('[aria-label]')]
-      .filter(el => REGEX_JOUR.test(el.getAttribute('aria-label')))
-      .filter(el => !estCoche(el));
 
   const survoler = el => {
     for (const t of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'mousemove']) {
@@ -54,19 +44,21 @@
   const defiler = () => {
     const c = conteneur();
     const avant = c.scrollTop;
-    c.scrollBy(0, c.clientHeight);
+    c.scrollBy(0, c.clientHeight * 0.8);
     return c.scrollTop > avant;
   };
   const remonter = () => conteneur().scrollTo(0, 0);
 
+  const casesLibres = () =>
+    [...document.querySelectorAll('[role="checkbox"][aria-checked="false"]')].filter(visible);
+
   const REGEX_SUPPR = /corbeille|supprimer|trash|delete/i;
-  const REGEX_EXCLU = /album|définitivement|permanently|partag|shar/i;
+  const REGEX_EXCLU = /souvenir|memor|album|définitivement|permanently|partag|shar/i;
 
   const boutonCorbeille = () =>
-    [...document.querySelectorAll('[aria-label], [title], [data-tooltip]')]
+    [...document.querySelectorAll('button, [role="button"]')]
       .filter(visible)
-      .filter(el => el.tagName !== 'A' && !el.closest('a[href], nav, [role="navigation"]'))
-      .filter(el => !el.closest('[role="dialog"], [role="alertdialog"]'))
+      .filter(el => !el.closest('[role="dialog"], [role="alertdialog"], nav, [role="navigation"]'))
       .find(el => REGEX_SUPPR.test(libelle(el)) && !REGEX_EXCLU.test(libelle(el)));
 
   const boutonConfirmer = () =>
@@ -77,80 +69,76 @@
         return REGEX_SUPPR.test(t) && !REGEX_EXCLU.test(t);
       });
 
-  if (globalThis.selectionGlobaleGooglePhotos) { console.error('Une sélection globale est déjà en cours.'); return; }
-  const selectionExistante = [...document.querySelectorAll('main [role="checkbox"][aria-checked="true"],[role="main"] [role="checkbox"][aria-checked="true"]')].some(visible) ||
-    [...document.querySelectorAll('[aria-label]')].some(el => visible(el) && REGEX_JOUR.test(el.getAttribute('aria-label') || '') && estCoche(el));
-  if (selectionExistante || [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some(visible)) {
-    console.error('Annulez toute sélection et fermez les dialogues Google avant de lancer.'); return;
-  }
-  globalThis.selectionGlobaleGooglePhotos = true;
-  let arret = false;
-  const stop = () => { arret = true; };
-  globalThis.arreterSelectionGooglePhotos = stop;
-  const pageInitiale = location.pathname;
-  const verifier = () => {
-    if (arret) throw Error('Arrêt demandé. La sélection reste dans Google Photos.');
-    if (location.pathname !== pageInitiale || document.hidden) throw Error('Page changée ou onglet masqué.');
+  const echap = () => {
+    const opts = { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true };
+    (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', opts));
   };
-  const attendre = async ms => { await sleep(ms); verifier(); };
-  const chargement = () => [...document.querySelectorAll('[role="progressbar"],[aria-busy="true"]')].some(visible);
-  let totalJours = 0;
-  async function parcourir(selectionner) {
-    let stable = 0, derniereHauteur = -1;
-    remonter(); await attendre(PAUSE);
-    for (let s = 0; s < DEFILEMENTS_MAX; s++) {
-      verifier();
-      if (chargement()) { await attendre(PAUSE); continue; }
-      const jours = boutonsJour();
-      if (!selectionner && jours.length) throw Error('Le passage de contrôle trouve des journées non sélectionnées. Aucune mise à la corbeille.');
-      for (const j of jours) {
-        verifier();
-        if (!j.isConnected || estCoche(j)) continue;
-        const nom = j.getAttribute('aria-label');
-        survoler(j.parentElement || j); survoler(j); await attendre(20);
-        j.click(); await attendre(100);
-        // Google can expose checked/pressed state, change the action label, or
-        // replace the selected control. A failed click must never be cached.
-        const nonCoches = () => boutonsJour().some(el => el.getAttribute('aria-label') === nom);
-        for (let essai = 0; essai < 10 && nonCoches(); essai++) await attendre(150);
-        if (nonCoches()) throw Error('Un clic de sélection n’a pas été confirmé. Aucune mise à la corbeille.');
-        totalJours++;
+
+  let lot = LOT, lots = 0, total = 0, vides = 0;
+  remonter();
+  await sleep(PAUSE);
+
+  for (let tour = 1; tour <= MAX_TOURS; tour++) {
+    let n = 0;
+    for (let s = 0; s < 6000 && n < lot; s++) {
+      for (const c of casesLibres()) {
+        survoler(c);
+        c.click();
+        n++;
+        await sleep(30);
+        if (n >= lot) break;
       }
-      if (jours.length) console.log(`Sélection en cours : ${totalJours} groupe(s) de journée(s), aucune suppression envoyée.`);
-      const c = conteneur(), hauteur = c.scrollHeight;
-      const auBas = c.scrollTop + c.clientHeight >= hauteur - 3;
-      stable = auBas && !jours.length && !chargement() && hauteur === derniereHauteur ? stable + 1 : 0;
-      derniereHauteur = hauteur;
-      if (stable >= FIN_STABLE) return;
-      if (!auBas && !defiler()) throw Error('Défilement bloqué avant le bas. Aucune mise à la corbeille.');
-      await attendre(auBas ? PAUSE * 2 : 700);
+      if (n >= lot) break;
+      if (!defiler()) { await sleep(1200); if (!defiler()) break; }
+      await sleep(600);
     }
-    throw Error('Limite de défilement atteinte. Aucune mise à la corbeille.');
-  }
-  try {
-    console.log('Sélection globale : aucun envoi à la corbeille avant la fin du défilement. Pour arrêter : arreterSelectionGooglePhotos().');
-    await parcourir(true);
-    if (!totalJours) { console.warn('Aucune journée sélectionnable. Cela ne prouve pas que la bibliothèque est vide.'); return; }
-    console.log('Sélection terminée. Second passage de contrôle, sans suppression.');
-    await parcourir(false);
-    console.log(`Fin du défilement stabilisée : ${totalJours} groupe(s) sélectionné(s). Une seule demande de mise à la corbeille va être envoyée.`);
-    await attendre(PAUSE);
+
+    if (n === 0) {
+      if (++vides >= 3) {
+        console.log(`✅ Terminé. ${lots} lot(s), ${total} photo(s) envoyée(s) à la corbeille.`);
+        break;
+      }
+      console.warn('⚠️ Aucune case trouvée sur ce passage, nouvel essai...');
+      remonter(); await sleep(PAUSE * 2);
+      continue;
+    }
+    vides = 0;
+    console.log(`☑️ ${n} photo(s) cliquée(s).`);
+    await sleep(PAUSE);
+
+    if (!SUPPRIMER) {
+      const b = boutonCorbeille();
+      console.log('🛑 Mode test : rien n\'est supprimé. Regarde en haut à gauche combien de photos sont sélectionnées.');
+      console.log(b ? `Bouton corbeille trouvé : "${libelle(b)}"` : 'Bouton corbeille NON trouvé.');
+      if (!b) {
+        console.log('Boutons visibles :\n' + [...document.querySelectorAll('button, [role="button"]')]
+          .filter(visible).map(libelle).filter(Boolean).join('\n'));
+      }
+      return;
+    }
+
+    remonter(); await sleep(PAUSE);
     const corbeille = boutonCorbeille();
-    if (!corbeille) throw Error('Bouton corbeille introuvable. Aucun envoi effectué.');
-    verifier(); corbeille.click();
+    if (corbeille) corbeille.click();
     let confirmer = null;
-    for (let i = 0; i < 10 && !confirmer; i++) { await attendre(PAUSE); confirmer = boutonConfirmer(); }
-    if (!confirmer) throw Error('Confirmation absente : Google a peut-être refusé cette sélection globale. Aucun nouvel essai ni fractionnement automatique.');
-    const dialogue = confirmer.closest('[role="dialog"], [role="alertdialog"]');
-    const texte = dialogue?.textContent || '';
-    const titre = dialogue?.querySelector('h1,h2,h3,[role="heading"]')?.textContent || '';
-    if (!/corbeille|trash|\bbin\b/i.test(texte) || /définitiv|permanen/i.test(titre + ' ' + confirmer.textContent + ' ' + libelle(confirmer)) || /corbeille (?:est )?pleine|(?:trash|bin) (?:is )?full/i.test(texte)) throw Error('Dialogue inattendu ou suppression définitive : aucune confirmation effectuée.');
-    verifier(); confirmer.click();
-    console.log('Une seule confirmation de mise à la corbeille a été envoyée à Google. Attendez la fin du traitement, puis vérifiez la grille et la corbeille. Ce message ne prouve pas que tout le compte est vide. La corbeille ne sera pas vidée par ce script.');
-  } catch (error) {
-    console.error('ARRÊT :', error.message, 'Vérifiez Google Photos avant de reprendre. Pour annuler la sélection restante, rechargez la page.');
-  } finally {
-    globalThis.selectionGlobaleGooglePhotos = false;
-    if (globalThis.arreterSelectionGooglePhotos === stop) delete globalThis.arreterSelectionGooglePhotos;
+    for (let i = 0; i < 10 && !confirmer; i++) { await sleep(PAUSE); confirmer = boutonConfirmer(); }
+
+    if (!confirmer) {
+      echap(); await sleep(PAUSE);
+      lot = Math.floor(lot / 2);
+      if (lot < 10) {
+        console.warn('❌ Suppression impossible. Recharge la page (F5) et réessaie.');
+        break;
+      }
+      console.warn(`⚠️ Suppression échouée : nouvel essai avec des lots de ${lot}. Recharge la page (F5) si des photos restent cochées.`);
+      remonter(); await sleep(PAUSE * 2);
+      continue;
+    }
+    confirmer.click();
+    lots++; total += n;
+    console.log(`🗑️ Lot ${lots} supprimé (${n} photo(s), total ${total})`);
+    await sleep(PAUSE * 4);
+    remonter();
+    await sleep(PAUSE * 2);
   }
 })();

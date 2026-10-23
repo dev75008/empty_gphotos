@@ -9,7 +9,7 @@
   <title>Passage Photos · Google Photos vers pCloud</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css?v=4">
-  <script type="module" src="./console-guide.js?v=2"></script>
+  <script type="module" src="./console-guide.js?v=3"></script>
   <script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
@@ -92,15 +92,16 @@
     <section id="errors-section" class="error-panel" hidden aria-labelledby="errors-title"><h2 id="errors-title">Fichiers à reprendre</h2><ul id="error-list"></ul></section>
     <section id="console-google" class="cleanup-panel console-panel" aria-labelledby="console-title">
       <div class="section-heading"><h2 id="console-title">Nettoyer Google Photos avec le script console</h2><span class="small">Chrome / Edge</span></div>
-      <p>Le script sélectionne progressivement les journées de la vue Photos jusqu’au bas de la grille, puis envoie une seule demande de mise à la corbeille pour la sélection entière. Il ne vide pas la corbeille.</p>
+      <p>Votre nouveau script sélectionne les cases des médias, par lots de 1 000 au départ. Le mode test sélectionne seulement, sans suppression. Il ne vide pas la corbeille.</p>
       <p>Ce mode est indépendant du contrôle pCloud : vous vérifiez vous-même vos sauvegardes et le compte Google ouvert. La suppression peut se répercuter sur vos appareils synchronisés.</p>
       <ol class="console-steps">
         <li><strong>Ouvrez votre compte Google Photos.</strong> Connectez-vous chez Google si nécessaire et vérifiez l’adresse du compte. Passage Photos ne reçoit aucun accès Google.<br><a class="button secondary" href="https://photos.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Photos / se connecter</a></li>
         <li><strong>Copiez le script ci-dessous.</strong> Dans l’onglet Google Photos, ouvrez la vue principale Photos, puis <kbd>F12</kbd> → Console. Si Chrome bloque le collage, relisez le script puis tapez manuellement <code>allow pasting</code> et appuyez sur Entrée.</li>
-        <li><strong>Collez le script dans la console Google Photos, puis appuyez sur Entrée.</strong> La sélection commence immédiatement, sans phrase à recopier. La mise à la corbeille attend la fin du défilement. Gardez cet onglet visible, sans intervenir. Pour arrêter le script, rechargez Google Photos ; une action déjà envoyée peut encore aboutir.</li>
-        <li><strong>Attendez Google, vérifiez Photos et Archives, puis ouvrez la corbeille.</strong> Une confirmation envoyée n’est pas une preuve que tout le compte est vide. Google peut refuser une sélection trop grande ; le script s’arrête alors sans recommencer par lots. Les Archives, le dossier verrouillé et les éléments seulement partagés ne sont pas couverts. Le bouton Google « Vider la corbeille » supprime définitivement tous ses éléments, anciens compris.<br><a href="https://photos.google.com/trash" target="_blank" rel="noopener noreferrer">Ouvrir la corbeille Google Photos</a></li>
+        <li><strong>Copiez et lancez d’abord en mode test.</strong> Collez le script dans la console Google Photos, puis appuyez sur Entrée : il sélectionne jusqu’à 1 000 cases et s’arrête sans supprimer. Vérifiez la sélection et le message « Bouton corbeille trouvé ». Pour envoyer réellement les médias, rechargez Google Photos afin d’annuler la sélection du test, cochez « Activer la mise à la corbeille » ci-dessous, puis copiez et lancez à nouveau le script.</li>
+        <li><strong>Gardez l’onglet ouvert et vérifiez le résultat.</strong> En mode suppression, le script traite les lots et réduit leur taille si la confirmation échoue. Pour arrêter, rechargez Google Photos ; une action déjà envoyée peut encore aboutir. Le compteur compte des clics, pas des copies vérifiées. Les Archives, le dossier verrouillé et les éléments seulement partagés ne sont pas couverts. Le bouton Google « Vider la corbeille » supprime définitivement tous ses éléments, anciens compris.<br><a href="https://photos.google.com/trash" target="_blank" rel="noopener noreferrer">Ouvrir la corbeille Google Photos</a></li>
       </ol>
-      <div class="cleanup-controls"><button id="console-copy" class="button secondary" disabled>Copier le script de sélection globale</button><a href="./google-photos-corbeille.txt?v=2" download="google-photos-corbeille.txt">Télécharger le script</a></div>
+      <label class="checkbox-label"><input id="console-delete-mode" type="checkbox" disabled>Activer la mise à la corbeille (SUPPRIMER = true). Sinon, sélection uniquement.</label>
+      <div class="cleanup-controls"><button id="console-copy" class="button secondary" disabled>Copier le script en mode test</button><a href="./google-photos-corbeille.txt?v=3" download="google-photos-corbeille.txt">Télécharger l’original en mode test</a></div>
       <p id="console-status" class="small" role="status">Chargement du script…</p>
       <details id="console-source"><summary>Lire ou copier le script manuellement</summary><label for="console-script">Script à exécuter uniquement dans la console de votre compte Google Photos</label><textarea id="console-script" readonly rows="12" spellcheck="false"></textarea></details>
       <p class="small">Ce site ne peut pas piloter un autre onglet ni lever la protection Chrome. « allow pasting » autorise le collage ; il n’exécute pas le script. Aucun jeton OAuth n’est nécessaire.</p>

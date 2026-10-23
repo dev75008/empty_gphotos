@@ -30,13 +30,21 @@ test('Console guide copies the supplied script without executing it and offers a
     await page.goto(base+'#console-google');
     await page.waitForFunction(()=>!document.getElementById('console-copy').disabled);
     assert.equal(await page.locator('#console-script').inputValue(),script);
+    assert.equal(await page.locator('#console-delete-mode').isChecked(),false);
     assert.equal(await page.locator('#console-google a').first().getAttribute('href'),'https://photos.google.com/');
     assert.equal(await page.locator('#console-google a').first().getAttribute('rel'),'noopener noreferrer');
     assert.match(await page.locator('#console-google').innerText(),/Il ne vide pas la corbeille/);
     await page.evaluate(()=>{Object.defineProperty(navigator.clipboard,'writeText',{configurable:true,value:async value=>{window.copiedScript=value;}});});
     await page.locator('#console-copy').click();
     assert.equal(await page.evaluate(()=>window.copiedScript),script);
-    assert.match(await page.locator('#console-status').textContent(),/Script copié/);
+    assert.match(await page.locator('#console-status').textContent(),/Script de test copié/);
+    await page.locator('#console-delete-mode').check();
+    const destructive=script.replace('const SUPPRIMER = false;','const SUPPRIMER = true;');
+    assert.equal(await page.locator('#console-script').inputValue(),destructive);
+    await page.locator('#console-copy').click();
+    assert.equal(await page.evaluate(()=>window.copiedScript),destructive);
+    await page.locator('#console-delete-mode').uncheck();
+    assert.equal(await page.locator('#console-script').inputValue(),script);
     assert.equal(await page.evaluate(()=>window.googlePhotosSuppressionEnCours),undefined);
     for(const width of [1440,768,390]){
       await page.setViewportSize({width,height:1000});
@@ -54,5 +62,10 @@ test('Console guide copies the supplied script without executing it and offers a
     assert.match(await page.locator('#console-status').textContent(),/Ctrl\+C/);
     assert.equal(await page.locator('#console-script').evaluate(el=>el.selectionEnd-el.selectionStart),script.length);
     assert.deepEqual(errors,[]);
+    await page.locator('#console-delete-mode').check();
+    await page.reload();
+    await page.waitForFunction(()=>!document.getElementById('console-copy').disabled);
+    assert.equal(await page.locator('#console-delete-mode').isChecked(),false);
+    assert.equal(await page.locator('#console-script').inputValue(),script);
   }finally{await browser.close();}
 });
