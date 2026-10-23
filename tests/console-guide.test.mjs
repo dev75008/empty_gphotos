@@ -4,7 +4,8 @@ import {readFile,access,mkdir} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
 import {chromium} from 'playwright-core';
 
-test('Console guide copies the supplied script without executing it and offers a clipboard fallback',{timeout:30000},async t=>{
+// CI runs several real Chrome suites concurrently on a small runner.
+test('Console guide copies the supplied script without executing it and offers a clipboard fallback',{timeout:90000},async t=>{
   let executablePath;
   for(const p of [process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium',join(process.env.PROGRAMFILES||'C:/Program Files','Google/Chrome/Application/chrome.exe')].filter(Boolean)){
     try{await access(p);executablePath=p;break;}catch{}
