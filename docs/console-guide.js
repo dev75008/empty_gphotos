@@ -5,10 +5,10 @@ const copy=document.getElementById('console-copy');
 const details=document.getElementById('console-source');
 async function load(){
   try{
-    const response=await fetch('./google-photos-corbeille.txt?v=1');
+    const response=await fetch('./google-photos-corbeille.txt?v=2');
     if(!response.ok)throw new Error('Téléchargement indisponible');
     field.value=await response.text();copy.disabled=false;
-    status.textContent='Script prêt à copier. Il démarre après collage et Entrée dans Google Photos.';
+    status.textContent='Sélection globale prête à copier : toutes les journées accessibles, puis une seule mise à la corbeille.';
   }catch{
     status.textContent='Chargement impossible. Rechargez la page ou téléchargez le fichier du script ci-dessous.';
   }

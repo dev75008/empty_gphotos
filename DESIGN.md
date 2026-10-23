@@ -20,4 +20,6 @@ Le vidage automatique optionnel reste dans la section de suppression définitive
 
 Le guide console reprend les panneaux existants, sans modifier le transfert. Quatre étapes relient l’ouverture du compte chez Google, la copie du script fourni par l’utilisateur, son lancement dans F12 et la vérification avant vidage manuel. Le bouton copie du texte sans exécuter de code ; le repli affiche une zone de texte sélectionnable si le presse-papiers est bloqué. Ce mode est explicitement indépendant de l’audit pCloud, sans badge de connexion Google ni preuve de sauvegarde inventée.
 
+La version de sélection globale attend le bas stable de la grille puis effectue un second passage de vérification avant une seule demande de mise à la corbeille. Le texte annonce le risque de refus par Google pour une sélection trop grande et l’absence de fractionnement automatique ; le vidage de la corbeille reste manuel.
+
 Rangement pCloud : les photos et vidéos apparaissent directement dans le dossier choisi ; les JSON sont regroupés dans « Métadonnées Takeout ». L’étape de destination explique ce résultat avant le lancement et propose « Regrouper les fichiers déjà reçus » pour les journaux de l’ancien rangement. Le regroupement reste dans le même parcours, avec le verrou, la pause, les erreurs et les bilans existants.

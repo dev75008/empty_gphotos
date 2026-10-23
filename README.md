@@ -240,22 +240,27 @@ L'ancien outil Python reste disponible séparément dans [son guide CLI](README-
 ## Script console Google Photos
 
 Dans Passage Photos, la section **Nettoyer Google Photos avec le script console**
-ouvre Google Photos et permet de copier ou télécharger le script par journées
-fourni par l’utilisateur. La connexion reste chez Google : aucun accès Google,
+ouvre Google Photos et permet de copier ou télécharger le script de sélection
+globale, adapté du script par journées fourni par l’utilisateur. La connexion reste chez Google : aucun accès Google,
 jeton OAuth ou mot de passe n’est transmis à Passage Photos.
 
 Dans Google Photos, ouvrez la vue principale Photos puis F12 → Console. Relisez
 le script. Si Chrome bloque le collage, tapez manuellement `allow pasting`, puis
-Entrée. Collez ensuite le script et appuyez sur Entrée : la mise à la corbeille
-démarre immédiatement. Pour arrêter, rechargez l’onglet ; une opération déjà
+Entrée. Collez ensuite le script et appuyez sur Entrée : la sélection démarre
+immédiatement. Le script fait défiler la grille et sélectionne les journées
+accessibles avant une seule demande de mise à la corbeille. Il vérifie les clics,
+effectue un second passage de contrôle, et attend plusieurs observations stables
+du bas sans indicateur de chargement. Une limite de défilement
+ou une erreur l’arrête ; il ne fractionne pas la sélection et ne réessaie pas la
+suppression. Google peut refuser une sélection trop grande. Pour arrêter, rechargez l’onglet ; une opération déjà
 envoyée peut encore aboutir. Le site ne peut ni exécuter ce texte dans un autre
 onglet ni désactiver la protection Chrome.
 
 Ce mode est indépendant du contrôle pCloud et ne certifie aucune sauvegarde.
-Le script fourni est conservé sans modification dans
-`docs/google-photos-corbeille.txt`. Il ne vide pas la corbeille et ne traite pas
+La version adaptée est dans `docs/google-photos-corbeille.txt`.
+Elle ne vide pas la corbeille et ne traite pas
 séparément les Archives, le dossier verrouillé ou les éléments seulement partagés.
 Son compteur concerne des journées sélectionnées, pas un nombre de médias vérifiés.
-Son message « Terminé » ne garantit pas que tout le compte est vide. Vérifiez les
+La confirmation envoyée ne garantit pas que tout le compte est vide. Vérifiez les
 vues concernées et vos copies avant le vidage définitif de toute la corbeille,
 anciens éléments compris. La suppression peut toucher les appareils synchronisés.
