@@ -18,4 +18,6 @@ Extension de nettoyage : le panneau de commandes reprend le papier gris, les bou
 
 Le vidage automatique optionnel reste dans la section de suppression définitive. La case est décochée par défaut, précise sa portée à la vue en cours et utilise la même phrase de confirmation que le vidage manuel. La confirmation de lancement annonce l’enchaînement irréversible ; aucun accord n’est réutilisé après un arrêt ou un rechargement.
 
+Le guide console reprend les panneaux existants, sans modifier le transfert. Quatre étapes relient l’ouverture du compte chez Google, la copie du script fourni par l’utilisateur, son lancement dans F12 et la vérification avant vidage manuel. Le bouton copie du texte sans exécuter de code ; le repli affiche une zone de texte sélectionnable si le presse-papiers est bloqué. Ce mode est explicitement indépendant de l’audit pCloud, sans badge de connexion Google ni preuve de sauvegarde inventée.
+
 Rangement pCloud : les photos et vidéos apparaissent directement dans le dossier choisi ; les JSON sont regroupés dans « Métadonnées Takeout ». L’étape de destination explique ce résultat avant le lancement et propose « Regrouper les fichiers déjà reçus » pour les journaux de l’ancien rangement. Le regroupement reste dans le même parcours, avec le verrou, la pause, les erreurs et les bilans existants.

@@ -2,7 +2,7 @@
 
 **[Ouvrir l'application sur GitHub Pages](https://dev75008.github.io/empty_gphotos/)**
 
-Le transfert web ne nécessite aucune installation, aucun Python ni compagnon local. La page lit les ZIP que vous choisissez, puis envoie leurs fichiers directement à pCloud. GitHub héberge le code de la page ; il ne reçoit pas vos photos, vos vidéos ni votre jeton pCloud. Le nettoyage automatisé après transfert utilise une extension Chrome/Edge à installer séparément.
+Le transfert web ne nécessite aucune installation, aucun Python ni compagnon local. La page lit les ZIP que vous choisissez, puis envoie leurs fichiers directement à pCloud. GitHub héberge le code de la page ; il ne reçoit pas vos photos, vos vidéos ni votre jeton pCloud. Le nettoyage propose un script à copier dans la console Google Photos ou une extension Chrome/Edge à installer séparément.
 
 ## Démarrer
 
@@ -237,3 +237,25 @@ Les tests de l’extension valident le dossier de contrôle produit par le vrai 
 Les tests du moteur utilisent IndexedDB simulé, de vrais ZIP et un simulateur pCloud : perte de réponse, reprise sans source après réception, contrôle des empreintes, corruption CRC, homonymes, dates, compte incorrect, restauration et absence de jetons dans le journal exporté. Les contrôles navigateur utilisent le vrai IndexedDB et l'OPFS de Chrome, avec pCloud simulé pour les écritures. Les appels CORS pCloud sans authentification sont également vérifiés. **Aucun transfert vers un compte pCloud réel n'a été validé ici faute d'accès utilisateur.** Commencez par une petite partie Takeout.
 
 L'ancien outil Python reste disponible séparément dans [son guide CLI](README-python.md). Il n'est pas nécessaire pour le site.
+## Script console Google Photos
+
+Dans Passage Photos, la section **Nettoyer Google Photos avec le script console**
+ouvre Google Photos et permet de copier ou télécharger le script par journées
+fourni par l’utilisateur. La connexion reste chez Google : aucun accès Google,
+jeton OAuth ou mot de passe n’est transmis à Passage Photos.
+
+Dans Google Photos, ouvrez la vue principale Photos puis F12 → Console. Relisez
+le script. Si Chrome bloque le collage, tapez manuellement `allow pasting`, puis
+Entrée. Collez ensuite le script et appuyez sur Entrée : la mise à la corbeille
+démarre immédiatement. Pour arrêter, rechargez l’onglet ; une opération déjà
+envoyée peut encore aboutir. Le site ne peut ni exécuter ce texte dans un autre
+onglet ni désactiver la protection Chrome.
+
+Ce mode est indépendant du contrôle pCloud et ne certifie aucune sauvegarde.
+Le script fourni est conservé sans modification dans
+`docs/google-photos-corbeille.txt`. Il ne vide pas la corbeille et ne traite pas
+séparément les Archives, le dossier verrouillé ou les éléments seulement partagés.
+Son compteur concerne des journées sélectionnées, pas un nombre de médias vérifiés.
+Son message « Terminé » ne garantit pas que tout le compte est vide. Vérifiez les
+vues concernées et vos copies avant le vidage définitif de toute la corbeille,
+anciens éléments compris. La suppression peut toucher les appareils synchronisés.

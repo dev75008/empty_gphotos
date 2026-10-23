@@ -1,0 +1,146 @@
+(async () => {
+  const PAUSE = 1500;
+  const MAX_TOURS = 5000;
+  const DEFILEMENTS_MAX = 200;
+  const DEFILEMENTS_MIN = 5;
+  const ESSAIS_VIDES_MAX = 4;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  if (!/photos\.google\.com\/?(u\/\d+\/?)?(\?.*)?$/.test(location.href)) {
+    console.error('⛔ Ouvre la page principale "Photos" (pas la corbeille, un album, une recherche...), puis relance.');
+    return;
+  }
+
+  const libelle = el =>
+    ((el.getAttribute('aria-label') || '') + ' ' +
+     (el.getAttribute('title') || '') + ' ' +
+     (el.getAttribute('data-tooltip') || '')).trim();
+
+  const visible = el => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight &&
+           s.visibility !== 'hidden' && s.display !== 'none';
+  };
+
+  const REGEX_JOUR = /^(Sélectionner toutes les photos|Select all photos)/i;
+  const estCoche = el =>
+    el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-pressed') === 'true';
+
+  const boutonsJour = () =>
+    [...document.querySelectorAll('[aria-label]')]
+      .filter(el => REGEX_JOUR.test(el.getAttribute('aria-label')))
+      .filter(el => !estCoche(el));
+
+  const survoler = el => {
+    for (const t of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'mousemove']) {
+      el.dispatchEvent(new MouseEvent(t, { bubbles: true }));
+    }
+  };
+
+  let cache = null;
+  const conteneur = () => {
+    if (cache && cache.isConnected) return cache;
+    let best = document.scrollingElement, max = 0;
+    for (const el of document.querySelectorAll('*')) {
+      const s = getComputedStyle(el);
+      if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 50) {
+        const surface = el.clientHeight * el.clientWidth;
+        if (surface > max) { max = surface; best = el; }
+      }
+    }
+    return (cache = best);
+  };
+  const defiler = () => {
+    const c = conteneur();
+    const avant = c.scrollTop;
+    c.scrollBy(0, c.clientHeight);
+    return c.scrollTop > avant;
+  };
+  const remonter = () => conteneur().scrollTo(0, 0);
+
+  const REGEX_SUPPR = /corbeille|supprimer|trash|delete/i;
+  const REGEX_EXCLU = /album|définitivement|permanently|partag|shar/i;
+
+  const boutonCorbeille = () =>
+    [...document.querySelectorAll('[aria-label], [title], [data-tooltip]')]
+      .filter(visible)
+      .filter(el => el.tagName !== 'A' && !el.closest('a[href], nav, [role="navigation"]'))
+      .filter(el => !el.closest('[role="dialog"], [role="alertdialog"]'))
+      .find(el => REGEX_SUPPR.test(libelle(el)) && !REGEX_EXCLU.test(libelle(el)));
+
+  const boutonConfirmer = () =>
+    [...document.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button, [role="dialog"] [role="button"], [role="alertdialog"] [role="button"]')]
+      .filter(visible)
+      .find(b => {
+        const t = b.textContent + ' ' + libelle(b);
+        return REGEX_SUPPR.test(t) && !REGEX_EXCLU.test(t);
+      });
+
+  const echap = () => {
+    const opts = { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true };
+    (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', opts));
+  };
+
+  remonter();
+  await sleep(PAUSE);
+
+  let lots = 0, essaisVides = 0, totalJours = 0;
+  let defilements = DEFILEMENTS_MAX;
+
+  for (let tour = 1; tour <= MAX_TOURS; tour++) {
+    let nbJours = 0;
+    for (let s = 0; s <= defilements; s++) {
+      for (const j of boutonsJour()) {
+        survoler(j.parentElement || j);
+        survoler(j);
+        await sleep(20);
+        j.click();
+        nbJours++;
+        await sleep(40);
+      }
+      if (s < defilements) {
+        if (!defiler()) { await sleep(900); break; }
+        await sleep(700);
+      }
+    }
+
+    if (nbJours === 0) {
+      if (++essaisVides >= ESSAIS_VIDES_MAX) {
+        console.log(`✅ Terminé. ${lots} lot(s), ${totalJours} journée(s) envoyées à la corbeille.`);
+        break;
+      }
+      remonter(); await sleep(PAUSE * 2);
+      continue;
+    }
+    essaisVides = 0;
+    console.log(`☑️ ${nbJours} journée(s) sélectionnée(s), suppression...`);
+    await sleep(PAUSE);
+
+    const corbeille = boutonCorbeille();
+    if (corbeille) corbeille.click();
+    let confirmer = null;
+    for (let i = 0; i < 10 && !confirmer; i++) { await sleep(PAUSE); confirmer = boutonConfirmer(); }
+
+    if (!confirmer) {
+      echap(); await sleep(PAUSE);
+      defilements = Math.floor(defilements / 2);
+      if (defilements < DEFILEMENTS_MIN) {
+        console.warn('❌ Suppression impossible même avec un petit lot. Recharge la page (F5) et réessaie.');
+        break;
+      }
+      console.warn(`⚠️ Lot trop gros ou bouton introuvable : nouvel essai avec ${defilements} défilements. Si des photos restent sélectionnées, recharge la page (F5).`);
+      remonter(); await sleep(PAUSE * 2);
+      continue;
+    }
+    confirmer.click();
+
+    lots++;
+    totalJours += nbJours;
+    console.log(`🗑️ Lot ${lots} supprimé (${nbJours} journée(s), total ${totalJours})`);
+    await sleep(PAUSE * 4);
+    remonter();
+    await sleep(PAUSE * 2);
+  }
+})();

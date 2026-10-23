@@ -8,7 +8,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.pcloud.com https://eapi.pcloud.com https://*.pcloud.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Passage Photos · Google Photos vers pCloud</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=3">
+  <link rel="stylesheet" href="./style.css?v=4">
+  <script type="module" src="./console-guide.js?v=1"></script>
   <script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
@@ -27,6 +28,7 @@
     <section id="connect-panel" class="connect-panel" aria-labelledby="connect-title">
       <div><h2 id="connect-title">Tout se passe ici.</h2><p>Choisissez vos archives, connectez pCloud et lancez le transfert. Vos fichiers sont envoyés directement à pCloud.</p>
         <p class="small">Gardez cet onglet ouvert pendant le transfert. Après une fermeture, sélectionnez à nouveau les ZIP pour reprendre.</p>
+        <p class="small"><a href="#console-google">Accéder au script de nettoyage Google Photos</a></p>
       </div>
       <button id="persist-button" class="button secondary">Protéger le journal de reprise</button>
     </section>
@@ -88,6 +90,21 @@
 
     <section id="archives-section" class="archive-panel" hidden aria-labelledby="archives-title"><div class="section-heading"><h2 id="archives-title">Archives inventoriées</h2><span id="archives-count" class="small"></span></div><div id="archive-list"></div><p class="small">Comparez cette liste avec toutes les parties indiquées par Google Takeout.</p></section>
     <section id="errors-section" class="error-panel" hidden aria-labelledby="errors-title"><h2 id="errors-title">Fichiers à reprendre</h2><ul id="error-list"></ul></section>
+    <section id="console-google" class="cleanup-panel console-panel" aria-labelledby="console-title">
+      <div class="section-heading"><h2 id="console-title">Nettoyer Google Photos avec le script console</h2><span class="small">Chrome / Edge</span></div>
+      <p>Le script par journées que vous avez fourni est disponible ici, sans modification. Il sélectionne les médias de la vue Photos et les envoie à la corbeille. Il ne vide pas la corbeille.</p>
+      <p>Ce mode est indépendant du contrôle pCloud : vous vérifiez vous-même vos sauvegardes et le compte Google ouvert. La suppression peut se répercuter sur vos appareils synchronisés.</p>
+      <ol class="console-steps">
+        <li><strong>Ouvrez votre compte Google Photos.</strong> Connectez-vous chez Google si nécessaire et vérifiez l’adresse du compte. Passage Photos ne reçoit aucun accès Google.<br><a class="button secondary" href="https://photos.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Photos / se connecter</a></li>
+        <li><strong>Copiez le script ci-dessous.</strong> Dans l’onglet Google Photos, ouvrez la vue principale Photos, puis <kbd>F12</kbd> → Console. Si Chrome bloque le collage, relisez le script puis tapez manuellement <code>allow pasting</code> et appuyez sur Entrée.</li>
+        <li><strong>Collez le script dans la console Google Photos, puis appuyez sur Entrée.</strong> La mise à la corbeille démarre immédiatement, sans phrase à recopier. Gardez cet onglet ouvert. Pour arrêter le script, rechargez Google Photos ; une action déjà envoyée peut encore aboutir.</li>
+        <li><strong>Vérifiez Photos et Archives, puis ouvrez la corbeille.</strong> Le message « Terminé » n’est pas une preuve que tout le compte est vide. Les Archives, le dossier verrouillé et les éléments seulement partagés ne sont pas couverts par ce script. Le bouton Google « Vider la corbeille » supprime définitivement tous ses éléments, anciens compris.<br><a href="https://photos.google.com/trash" target="_blank" rel="noopener noreferrer">Ouvrir la corbeille Google Photos</a></li>
+      </ol>
+      <div class="cleanup-controls"><button id="console-copy" class="button secondary" disabled>Copier le script de mise à la corbeille</button><a href="./google-photos-corbeille.txt" download="google-photos-corbeille.txt">Télécharger le script</a></div>
+      <p id="console-status" class="small" role="status">Chargement du script…</p>
+      <details id="console-source"><summary>Lire ou copier le script manuellement</summary><label for="console-script">Script à exécuter uniquement dans la console de votre compte Google Photos</label><textarea id="console-script" readonly rows="12" spellcheck="false"></textarea></details>
+      <p class="small">Ce site ne peut pas piloter un autre onglet ni lever la protection Chrome. « allow pasting » autorise le collage ; il n’exécute pas le script. Aucun jeton OAuth n’est nécessaire.</p>
+    </section>
     <section class="cleanup-panel" aria-labelledby="cleanup-title">
       <div class="section-heading"><h2 id="cleanup-title">Après le transfert : nettoyer Google Photos</h2><span id="cleanup-status" class="small">Contrôle requis</span></div>
       <p>La suppression se fait dans Google Photos. L’extension Chrome/Edge peut automatiser les clics après contrôle ; l’API Google ne propose pas cette suppression.</p>
@@ -105,7 +122,7 @@
       <div class="cleanup-controls"><button id="cleanup-guide-button" class="button secondary" disabled>Afficher le guide de suppression</button><span id="cleanup-checklist-hint" class="small">Le guide sera disponible après les contrôles et confirmations.</span></div>
     </section>
     <details class="logs"><summary>Journal des opérations</summary><pre id="logs" tabindex="0">Les opérations apparaîtront ici.</pre></details>
-    <footer><p>Le transfert conserve les fichiers Google. L’extension de nettoyage s’active séparément.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
+    <footer><p>Le transfert conserve les fichiers Google. Le nettoyage se lance séparément dans Google Photos.</p><a href="https://github.com/dev75008/empty_gphotos" target="_blank" rel="noopener noreferrer">Code source et guide complet</a></footer>
   </main>
 
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">Trois étapes, puis le transfert.</h2><button id="close-help" class="text-button" aria-label="Fermer le mode d'emploi">Fermer</button></div>
